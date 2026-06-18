@@ -9,20 +9,23 @@ interface Props {
   slot: 'tops' | 'bottoms';
 }
 
-/** The manual colour palette: tap a patch to select; tap a shade segment to set light->dark. */
+/**
+ * The manual colour palette: tap a patch to select; tap shade segments to record
+ * which shades (light->dark) you own — you can pick more than one per colour.
+ */
 export function SwatchGrid({ slot }: Props) {
   const t = useTheme();
   const selected = useStore((s) => (slot === 'tops' ? s.tops : s.bottoms));
   const shades = useStore((s) => (slot === 'tops' ? s.shadeTops : s.shadeBottoms));
   const toggleColor = useStore((s) => s.toggleColor);
-  const setShade = useStore((s) => s.setShade);
+  const toggleShade = useStore((s) => s.toggleShade);
 
   return (
     <View style={styles.grid}>
       {KEYS.map((k: ColorKey) => {
         const on = selected.includes(k);
-        const idx = (shades[k] ?? 2) as ShadeIndex;
-        const fill = COLORS[k].shades[idx];
+        const picked = shades[k] ?? [2];
+        const fill = COLORS[k].shades[picked[0] ?? 2];
         return (
           <View key={k} style={styles.cellWrap}>
             <Pressable
@@ -43,11 +46,12 @@ export function SwatchGrid({ slot }: Props) {
                         key={i}
                         accessibilityRole="button"
                         accessibilityLabel={`${k} shade ${i + 1} of 5`}
-                        onPress={() => setShade(slot, k, i as ShadeIndex)}
+                        accessibilityState={{ selected: picked.includes(i as ShadeIndex) }}
+                        onPress={() => toggleShade(slot, k, i as ShadeIndex)}
                         style={[
                           styles.seg,
                           { backgroundColor: sh },
-                          i === idx && styles.segActive,
+                          picked.includes(i as ShadeIndex) && styles.segActive,
                         ]}
                       />
                     ))}

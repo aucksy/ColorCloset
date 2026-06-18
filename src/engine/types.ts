@@ -13,8 +13,9 @@ export type DepthId = 'fair' | 'light' | 'medium' | 'tan' | 'deep' | 'rich';
 /** Visual-risk axis, independent of occasion. */
 export type StyleName = 'Minimal' | 'Classic' | 'Bold' | 'Statement';
 
-/** Where the user is going. */
-export type Occasion = 'Everyday' | 'Office' | 'Date night' | 'Party' | 'Travel';
+/** How dressed-up the look should read (the "Dress code" axis). Kept to three
+ *  simple buckets; the engine maps each to a different ranking bias. */
+export type Occasion = 'Casual' | 'Formal' | 'Relaxed';
 
 /** Optional clothing-context tags. */
 export type ClothType = 'casual' | 'formal' | 'gym' | 'ethnic';

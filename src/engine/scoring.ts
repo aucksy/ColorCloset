@@ -73,16 +73,22 @@ export function score(
   const fl = skin ? skin.flatter : [];
   if (fl.includes(t)) s += 0.08;
   if (fl.includes(b)) s += 0.06;
-  if (occ === 'Office') {
-    if (CORP.has(t)) s += 0.06;
-    if (CORP.has(b)) s += 0.06;
-    if (BOLD.has(t)) s -= 0.05;
-  }
-  if (occ === 'Party' || occ === 'Date night') {
-    if (BOLD.has(t)) s += 0.1;
-  }
-  if (occ === 'Travel' || occ === 'Everyday') {
+  // Dress-code bias: each of the three buckets nudges ranking a different way.
+  const dl = Math.abs(lum(t) - lum(b));
+  if (occ === 'Formal') {
+    // dressed-up: favour clean/corporate colours, ease off loud ones
+    if (CORP.has(t)) s += 0.07;
+    if (CORP.has(b)) s += 0.07;
+    if (BOLD.has(t)) s -= 0.07;
+    if (BOLD.has(b)) s -= 0.05;
+  } else if (occ === 'Casual') {
+    // everyday: a grounded neutral bottom + a little crisp contrast read well
+    if (NEUTRAL.has(b)) s += 0.05;
+    if (dl > 0.3) s += 0.04;
+  } else if (occ === 'Relaxed') {
+    // off-duty ease: soft, tonal, low-contrast pairings feel relaxed
     if (NEUTRAL.has(b)) s += 0.04;
+    if (dl < 0.22) s += 0.06;
   }
   s += styleBias(t, b, style);
   return s;

@@ -17,8 +17,8 @@ import type {
 } from './types';
 
 /**
- * Every (top × bottom) whose base score (occasion "Everyday", no style) meets the
- * universe threshold (0.55), best-first. Stable across occasion/style. If nothing
+ * Every (top × bottom) whose base score (dress code "Casual", no style) meets the
+ * universe threshold (0.55), best-first. Stable across dress-code/style. If nothing
  * clears the threshold, returns the single best pairing so the user is never stuck.
  */
 export function comboUniverse(
@@ -29,7 +29,7 @@ export function comboUniverse(
   const out: Combo[] = [];
   tops.forEach((t) =>
     bottoms.forEach((b) => {
-      const sc = score(t, b, skin, 'Everyday');
+      const sc = score(t, b, skin, 'Casual');
       if (sc >= UNIVERSE_THRESHOLD) out.push({ id: t + '|' + b, t, b, sc });
     })
   );
@@ -37,7 +37,7 @@ export function comboUniverse(
     let best: Combo | null = null;
     tops.forEach((t) =>
       bottoms.forEach((b) => {
-        const sc = score(t, b, skin, 'Everyday');
+        const sc = score(t, b, skin, 'Casual');
         if (!best || sc > best.sc) best = { id: t + '|' + b, t, b, sc };
       })
     );

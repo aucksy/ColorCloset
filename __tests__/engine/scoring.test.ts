@@ -43,11 +43,20 @@ describe('styleBias (§9.6)', () => {
 });
 
 describe('score (combined) is NOT clamped', () => {
-  it('sums harmony + flatter + occasion + style', () => {
+  it('sums harmony + flatter + dress-code + style', () => {
     const skin = skinObj('medium');
-    // Mustard+Navy @ Party/Bold, Medium skin:
-    // harmony 1.0 (clamped) + flatter (Mustard .08) + Party-bold-top .10 + Bold style .37 = 1.55
-    expect(score('Mustard', 'Navy', skin, 'Party', 'Bold')).toBeCloseTo(1.55, 10);
+    // Mustard+Navy @ Casual/Bold, Medium skin:
+    // harmony 1.0 (clamped) + flatter (Mustard .08) + Casual (neutral bottom .05 +
+    // high-contrast .04) + Bold style .37 = 1.54
+    expect(score('Mustard', 'Navy', skin, 'Casual', 'Bold')).toBeCloseTo(1.54, 10);
+  });
+
+  it('Formal eases off bold colours that Casual rewards', () => {
+    const skin = skinObj('medium');
+    // Burgundy (bold, not corporate) reads better Casual than Formal.
+    expect(score('Burgundy', 'Grey', skin, 'Casual', 'Classic')).toBeGreaterThan(
+      score('Burgundy', 'Grey', skin, 'Formal', 'Classic')
+    );
   });
 });
 

@@ -58,7 +58,7 @@ export default function Onboarding() {
   const scanSkin = async (source: PickSource) => {
     setBusy(true);
     setHint('');
-    const uri = await pickImage(source);
+    const uri = await pickImage(source, { front: source === 'camera' });
     if (uri) {
       const d = await extractSkinDepth(uri);
       if (d) {
@@ -199,12 +199,12 @@ function ScanButtons({ t, busy, onCamera, onGallery }: { t: ThemeT; busy: boolea
           <Text style={[styles.busyTxt, { color: t.muted, fontFamily: fonts.uiRegular }]}>Reading colours…</Text>
         </View>
       ) : (
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'stretch' }}>
           <View style={{ flex: 1 }}>
-            <Button title="Scan with camera" variant="goldline" onPress={onCamera} icon={<Icon name="grid" size={18} color={t.goldSoft} />} />
+            <Button title="Camera" variant="goldline" onPress={onCamera} icon={<Icon name="camera" size={18} color={t.goldSoft} />} />
           </View>
           <View style={{ flex: 1 }}>
-            <Button title="Gallery" variant="ghost" onPress={onGallery} />
+            <Button title="Gallery" variant="ghost" onPress={onGallery} icon={<Icon name="image" size={18} color={t.ink} />} />
           </View>
         </View>
       )}

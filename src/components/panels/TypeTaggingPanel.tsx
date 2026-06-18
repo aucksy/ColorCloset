@@ -63,12 +63,12 @@ export function TypeTaggingPanel() {
 
       <Text style={[styles.secH, { color: t.accent, fontFamily: fonts.mono }]}>TOPS</Text>
       {uniqTops.map((c) => (
-        <Row key={`t-${c}`} color={c} hex={shadeHex(c, shadeTops[c])} />
+        <Row key={`t-${c}`} color={c} hex={shadeHex(c, shadeTops[c]?.[0])} />
       ))}
 
       <Text style={[styles.secH, { color: t.accent, fontFamily: fonts.mono }]}>BOTTOMS</Text>
       {uniqBottoms.map((c) => (
-        <Row key={`b-${c}`} color={c} hex={shadeHex(c, shadeBottoms[c])} />
+        <Row key={`b-${c}`} color={c} hex={shadeHex(c, shadeBottoms[c]?.[0])} />
       ))}
     </PanelShell>
   );

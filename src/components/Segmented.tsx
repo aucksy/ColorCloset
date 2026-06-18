@@ -50,7 +50,7 @@ export function Segmented({ value, onChange }: Props) {
         </Animated.View>
       )}
       {tab('rec', 'Style me')}
-      {tab('shop', 'What to buy')}
+      {tab('shop', 'Colors to buy')}
     </View>
   );
 }

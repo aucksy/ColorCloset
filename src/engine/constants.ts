@@ -4,14 +4,14 @@
  */
 import type { ClothType, Occasion, StyleName } from './types';
 
-export const OCC: Occasion[] = ['Everyday', 'Office', 'Date night', 'Party', 'Travel'];
+/** The three "Dress code" buckets, in order. The engine biases ranking per bucket;
+ *  the user just picks how dressed-up they want to read and we decide the rest. */
+export const OCC: Occasion[] = ['Casual', 'Formal', 'Relaxed'];
 
 export const OCC_PHRASE: Record<Occasion, string> = {
-  Everyday: 'everyday wear',
-  Office: 'the office',
-  'Date night': 'date night',
-  Party: 'a night out',
-  Travel: 'travel',
+  Casual: 'a casual day',
+  Formal: 'a formal occasion',
+  Relaxed: 'a relaxed day',
 };
 
 export const STYLES: StyleName[] = ['Minimal', 'Classic', 'Bold', 'Statement'];

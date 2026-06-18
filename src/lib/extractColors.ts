@@ -4,21 +4,24 @@
  * Pipeline (all on-device, no ML, deterministic):
  *  1. Decode the photo with Skia and downscale to a small offscreen surface.
  *  2. Keep only the central region (drop the outer border = background).
- *  3. Grey-world white-balance to neutralise the photo's colour cast.
- *  4. k-means cluster the pixels into dominant colours.
+ *  3. GENTLE white-balance to ease an obvious colour cast — capped and applied at
+ *     half strength so a photo dominated by one garment colour (e.g. a red shirt)
+ *     is *not* neutralised toward grey, which full grey-world would do.
+ *  4. k-means cluster the kept pixels into dominant colours.
  *  5. Map each significant cluster to the nearest of the 16 named colours.
  *
- * This is materially better than naive nearest-pixel counting, but colour from a
- * casual photo is still hard — the manual palette is always the reliable fallback.
+ * Works for the common wardrobe shots — clothes on hangers, or a folded stack —
+ * but colour from a casual photo is still hard, so the manual palette is always
+ * the reliable fallback (callers keep it when this returns []).
  */
 import { AlphaType, ColorType, Skia } from '@shopify/react-native-skia';
 import { KEYS, nearest, type ColorKey } from '@/engine';
 
-const SAMPLE = 84; // offscreen size
-const BORDER = 0.15; // ignore outer 15%
-const MIN_SHARE = 0.06; // a colour must be >6% of kept pixels
-const K = 6;
-const ITERS = 8;
+const SAMPLE = 110; // offscreen size (more pixels -> steadier clusters)
+const BORDER = 0.12; // ignore outer 12% (background / hangers / edges)
+const MIN_SHARE = 0.08; // a colour must be >8% of kept pixels to count
+const K = 8;
+const ITERS = 10;
 
 type RGB = [number, number, number];
 
@@ -48,7 +51,7 @@ function loadPixels(uri: string): Promise<Uint8Array | null> {
   });
 }
 
-/** Collect central pixels, grey-world white-balanced. */
+/** Collect central pixels, gently white-balanced (cast-reduced, not desaturated). */
 function centralPixels(px: Uint8Array): RGB[] {
   const lo = Math.floor(SAMPLE * BORDER);
   const hi = SAMPLE - lo;
@@ -64,11 +67,15 @@ function centralPixels(px: Uint8Array): RGB[] {
     }
   }
   if (!pts.length) return pts;
-  // grey-world: scale each channel toward the overall mean grey
+  // Gentle grey-world: nudge each channel toward the mean grey, but cap the gain
+  // and apply it at half strength so a strongly single-coloured photo keeps its hue.
   const n = pts.length;
   const mr = sr / n, mg = sg / n, mb = sb / n;
   const grey = (mr + mg + mb) / 3;
-  const kr = mr ? grey / mr : 1, kg = mg ? grey / mg : 1, kb = mb ? grey / mb : 1;
+  const soften = (k: number) => 1 + (Math.max(0.85, Math.min(1.18, k)) - 1) * 0.5;
+  const kr = soften(mr ? grey / mr : 1);
+  const kg = soften(mg ? grey / mg : 1);
+  const kb = soften(mb ? grey / mb : 1);
   for (const p of pts) {
     p[0] = Math.max(0, Math.min(255, p[0] * kr));
     p[1] = Math.max(0, Math.min(255, p[1] * kg));
@@ -142,7 +149,7 @@ export async function extractColors(uri: string): Promise<ColorKey[]> {
     byName.set(name, (byName.get(name) ?? 0) + c.weight);
   }
   const ranked = [...byName.entries()].sort((a, b) => b[1] - a[1]);
-  let picked = ranked.filter(([, w]) => w > MIN_SHARE).slice(0, 6).map(([name]) => name);
+  let picked = ranked.filter(([, w]) => w > MIN_SHARE).slice(0, 5).map(([name]) => name);
   if (picked.length < 2) picked = ranked.slice(0, 3).map(([name]) => name);
   // keep canonical palette order
   return KEYS.filter((k) => picked.includes(k)) as ColorKey[];

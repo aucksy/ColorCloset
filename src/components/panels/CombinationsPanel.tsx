@@ -37,8 +37,8 @@ export function CombinationsPanel() {
       style={[styles.row, { backgroundColor: t.glass, borderColor: t.line, opacity: isWorn ? 0.6 : 1 }]}
     >
       <View style={[styles.pair, { borderColor: t.line2 }]}>
-        <View style={{ flex: 1, backgroundColor: shadeHex(c.t, shadeTops[c.t]) }} />
-        <View style={{ flex: 1, backgroundColor: shadeHex(c.b, shadeBottoms[c.b]) }} />
+        <View style={{ flex: 1, backgroundColor: shadeHex(c.t, shadeTops[c.t]?.[0]) }} />
+        <View style={{ flex: 1, backgroundColor: shadeHex(c.b, shadeBottoms[c.b]?.[0]) }} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[styles.cn, { color: t.ink, fontFamily: fonts.uiSemi }]}>

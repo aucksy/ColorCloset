@@ -10,6 +10,8 @@ export type IconName =
   | 'chevron-right'
   | 'check'
   | 'grid'
+  | 'camera'
+  | 'image'
   | 'menu'
   | 'pencil'
   | 'bookmark'
@@ -35,9 +37,24 @@ function paths(name: IconName, c: string, sw: number): ReactNode {
     case 'chevron-right':
       return p('M9 6l6 6-6 6');
     case 'check':
-      return p('M5 13l4 4L19 7');
+      return p('M5 12l5 5 9-10');
     case 'grid':
       return p('M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z');
+    case 'camera':
+      return (
+        <>
+          {p('M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z')}
+          <Circle cx={12} cy={13} r={3.4} stroke={c} strokeWidth={sw} fill="none" />
+        </>
+      );
+    case 'image':
+      return (
+        <>
+          {p('M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z')}
+          <Circle cx={8.5} cy={8.5} r={1.6} stroke={c} strokeWidth={sw} fill="none" />
+          {p('M21 16l-5-5L5 21')}
+        </>
+      );
     case 'menu':
       return p('M4 7h16M4 12h16M4 17h16');
     case 'pencil':

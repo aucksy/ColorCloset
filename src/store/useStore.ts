@@ -45,8 +45,9 @@ interface PersistedState {
   depth: DepthId | null;
   tops: ColorKey[];
   bottoms: ColorKey[];
-  shadeTops: Record<ColorKey, ShadeIndex>;
-  shadeBottoms: Record<ColorKey, ShadeIndex>;
+  // Each owned colour can hold several shades (light->dark) the user actually owns.
+  shadeTops: Record<ColorKey, ShadeIndex[]>;
+  shadeBottoms: Record<ColorKey, ShadeIndex[]>;
   types: Record<ColorKey, ClothType[]>;
   worn: Record<string, string>;
   saved: SavedLook[];
@@ -70,7 +71,7 @@ interface Actions {
   // wardrobe
   toggleColor: (slot: Slot, key: ColorKey) => void;
   setColors: (slot: Slot, colors: ColorKey[]) => void;
-  setShade: (slot: Slot, key: ColorKey, idx: ShadeIndex) => void;
+  toggleShade: (slot: Slot, key: ColorKey, idx: ShadeIndex) => void;
   addTypeToColors: (colors: ColorKey[], type: ClothType) => void;
   // deck walk
   regenerate: () => boolean;
@@ -98,7 +99,7 @@ interface Actions {
 export type Store = PersistedState & SessionState & Actions;
 
 const SESSION_DEFAULTS: SessionState = {
-  occasion: 'Everyday',
+  occasion: 'Casual',
   typeFilter: 'all',
   current: null,
   currentName: '',
@@ -141,7 +142,7 @@ export const useStore = create<Store>()(
         const next = KEYS.filter((k) => setK.has(k)); // keep canonical order
         const shadeField = slot === 'tops' ? 'shadeTops' : 'shadeBottoms';
         const shades = { ...s[shadeField] };
-        if (adding && shades[key] == null) shades[key] = 2;
+        if (adding && shades[key] == null) shades[key] = [2];
         set({ [slot]: next, [shadeField]: shades } as Partial<Store>);
       },
 
@@ -152,7 +153,7 @@ export const useStore = create<Store>()(
         const shadeField = slot === 'tops' ? 'shadeTops' : 'shadeBottoms';
         const shades = { ...s[shadeField] };
         next.forEach((k) => {
-          if (shades[k] == null) shades[k] = 2;
+          if (shades[k] == null) shades[k] = [2];
         });
         set({ [slot]: next, [shadeField]: shades } as Partial<Store>);
       },
@@ -168,13 +169,26 @@ export const useStore = create<Store>()(
         set({ types });
       },
 
-      setShade: (slot, key, idx) => {
+      toggleShade: (slot, key, idx) => {
         const s = get();
         const shadeField = slot === 'tops' ? 'shadeTops' : 'shadeBottoms';
-        const shades = { ...s[shadeField], [key]: idx };
         const arr = slot === 'tops' ? s.tops : s.bottoms;
+        const owned = arr.includes(key);
+        const cur = s[shadeField][key] ?? [];
+        let nextShades: ShadeIndex[];
+        if (!owned) {
+          // First touch: select the colour with just this shade.
+          nextShades = [idx];
+        } else if (cur.includes(idx)) {
+          // Toggling off — but never leave a selected colour with zero shades.
+          nextShades = cur.filter((i) => i !== idx);
+          if (nextShades.length === 0) nextShades = [idx];
+        } else {
+          nextShades = [...cur, idx].sort((a, b) => a - b) as ShadeIndex[];
+        }
+        const shades = { ...s[shadeField], [key]: nextShades };
         // Tapping a shade also selects the colour (prototype behaviour).
-        const next = arr.includes(key) ? arr : KEYS.filter((k) => arr.includes(k) || k === key);
+        const next = owned ? arr : KEYS.filter((k) => arr.includes(k) || k === key);
         set({ [shadeField]: shades, [slot]: next } as Partial<Store>);
       },
 
@@ -241,8 +255,8 @@ export const useStore = create<Store>()(
           id: Date.now(),
           t,
           b,
-          th: shadeHex(t, s.shadeTops[t]),
-          bh: shadeHex(b, s.shadeBottoms[b]),
+          th: shadeHex(t, s.shadeTops[t]?.[0]),
+          bh: shadeHex(b, s.shadeBottoms[b]?.[0]),
           name: s.currentName || nameFor(t, b, s.style),
           occ: s.occasion,
           style: s.style,
@@ -282,8 +296,23 @@ export const useStore = create<Store>()(
     }),
     {
       name: 'colorcloset',
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => activeStorage),
+      // v1 stored one shade per colour (a number); v2 stores an array of shades.
+      migrate: (persisted: any, version) => {
+        if (persisted && version < 2) {
+          const toArr = (m: Record<string, unknown> | undefined) => {
+            const out: Record<string, ShadeIndex[]> = {};
+            Object.entries(m ?? {}).forEach(([k, v]) => {
+              out[k] = Array.isArray(v) ? (v as ShadeIndex[]) : [v as ShadeIndex];
+            });
+            return out;
+          };
+          persisted.shadeTops = toArr(persisted.shadeTops);
+          persisted.shadeBottoms = toArr(persisted.shadeBottoms);
+        }
+        return persisted;
+      },
       partialize: (s): PersistedState => ({
         depth: s.depth,
         tops: s.tops,

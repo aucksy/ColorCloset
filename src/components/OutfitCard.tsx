@@ -24,8 +24,8 @@ export function OutfitCard() {
   const { t: topK, b: botK } = current;
   const skin = skinObj(depth);
   const catLabel = style ? style.toUpperCase() : catFor(topK, botK);
-  const topHex = shadeHex(topK, shadeTops[topK]);
-  const botHex = shadeHex(botK, shadeBottoms[botK]);
+  const topHex = shadeHex(topK, shadeTops[topK]?.[0]);
+  const botHex = shadeHex(botK, shadeBottoms[botK]?.[0]);
   const why = whyFor(topK, botK, occasion, style);
   const flatterHit = skin.flatter.includes(topK) || skin.flatter.includes(botK);
   const id = `${topK}|${botK}`;

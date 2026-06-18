@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -64,7 +63,9 @@ export default function Main() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Android back: close an open overlay first; otherwise let the OS exit.
+  // Android back: unwind in-app state in the order the user arrived at it —
+  // overlay → drawer → "Colors to buy" tab → Style me. Only the bare Style-me
+  // screen falls through to let the OS exit (mirrors "back to where I came from").
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (panel) {
@@ -75,10 +76,14 @@ export default function Main() {
         closeDrawer();
         return true;
       }
+      if (pane === 'shop') {
+        setPane('rec');
+        return true;
+      }
       return false;
     });
     return () => sub.remove();
-  }, [panel, drawerOpen, closePanel, closeDrawer]);
+  }, [panel, drawerOpen, closePanel, closeDrawer, pane]);
 
   const skin = skinObj(depth);
   const { total, worn: wornCount } = uniStats(tops, bottoms, skin, worn);
@@ -131,7 +136,7 @@ export default function Main() {
       >
         {pane === 'rec' ? (
           <Animated.View key="rec" entering={FadeIn.duration(motion.fast)}>
-            <Text style={[styles.chLabel, { color: t.faint, fontFamily: fonts.mono }]}>OCCASION</Text>
+            <Text style={[styles.chLabel, { color: t.faint, fontFamily: fonts.mono }]}>DRESS CODE</Text>
             <ChipRow
               items={OCC.map((o) => ({ value: o as Occasion, label: o }))}
               value={occasion}
@@ -167,6 +172,13 @@ export default function Main() {
               <>
                 <OutfitCard />
                 <View style={styles.actions}>
+                  <Button
+                    title="Another"
+                    variant="goldline"
+                    onPress={onAnother}
+                    style={{ flex: 1 }}
+                    icon={<Icon name="refresh" size={18} color={t.goldSoft} strokeWidth={2.2} />}
+                  />
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={isSaved ? 'Saved' : 'Save look'}
@@ -176,7 +188,9 @@ export default function Main() {
                   >
                     <Icon name="bookmark" size={20} color={isSaved ? t.accent : t.ink} />
                   </Pressable>
-                  <Button title="Mark it worn" onPress={onWore} style={{ flex: 1 }} icon={<Icon name="check" size={18} color={t.onGold} strokeWidth={3} />} />
+                </View>
+                <View style={styles.worn}>
+                  <Button title="Mark it worn" onPress={onWore} icon={<Icon name="check" size={18} color={t.onGold} strokeWidth={2.6} />} />
                 </View>
               </>
             ) : (
@@ -207,20 +221,6 @@ export default function Main() {
         )}
       </ScrollView>
 
-      {/* floating "next look" button — browse through the looks */}
-      {pane === 'rec' && current && (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Next look"
-          onPress={onAnother}
-          style={({ pressed }) => [styles.fab, { bottom: insets.bottom + 22, transform: [{ scale: pressed ? 0.93 : 1 }] }]}
-        >
-          <LinearGradient colors={t.goldGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fabFill}>
-            <Icon name="refresh" size={26} color={t.onGold} strokeWidth={2.4} />
-          </LinearGradient>
-        </Pressable>
-      )}
-
       {/* overlays */}
       {panel === 'skin' && <SkinPanel />}
       {panel === 'about' && <AboutPanel />}
@@ -244,24 +244,11 @@ const styles = StyleSheet.create({
   progLabel: { borderWidth: 1, borderRadius: 99, paddingVertical: 7, paddingHorizontal: 13 },
   progTxt: { fontSize: 11 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 18, alignItems: 'stretch' },
+  worn: { marginTop: 10 },
   iconAct: { width: 56, borderWidth: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   emptyRec: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 20 },
   emptyIc: { width: 56, height: 56, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   emptyH: { fontSize: 19, marginBottom: 7, textAlign: 'center' },
   emptyP: { fontSize: 13, lineHeight: 20, textAlign: 'center', maxWidth: 250 },
   emptyBtn: { alignSelf: 'stretch', paddingHorizontal: 50, marginTop: 18 },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    overflow: 'hidden',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-  },
-  fabFill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

@@ -25,9 +25,9 @@ describe('golden: sample wardrobe', () => {
   });
 
   it.each([
-    ['Everyday', 'Minimal'],
-    ['Office', 'Classic'],
-    ['Party', 'Bold'],
+    ['Casual', 'Minimal'],
+    ['Formal', 'Classic'],
+    ['Relaxed', 'Bold'],
   ] as const)('ranked deck for %s + %s matches the snapshot', (occ, style) => {
     const deck = buildDeck({
       tops: SAMPLE_TOPS,

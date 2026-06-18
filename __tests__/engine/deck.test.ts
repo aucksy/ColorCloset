@@ -100,7 +100,7 @@ describe('buildDeck', () => {
       tops: ['White', 'Burgundy'],
       bottoms: ['Grey', 'Navy'],
       skin,
-      occ: 'Party',
+      occ: 'Casual',
       style: 'Bold',
       types: {},
       typeFilter: 'all',

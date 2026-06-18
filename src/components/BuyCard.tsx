@@ -49,8 +49,8 @@ export function BuyCard({ suggestion, slot, index }: Props) {
         </Text>
         <View style={styles.grid}>
           {shown.map((piece) => {
-            const topHex = slot === 'bottoms' ? shadeHex(piece, shadeTops[piece]) : hx(c);
-            const botHex = slot === 'bottoms' ? hx(c) : shadeHex(piece, shadeBottoms[piece]);
+            const topHex = slot === 'bottoms' ? shadeHex(piece, shadeTops[piece]?.[0]) : hx(c);
+            const botHex = slot === 'bottoms' ? hx(c) : shadeHex(piece, shadeBottoms[piece]?.[0]);
             return (
               <View key={piece} style={styles.item}>
                 <View style={[styles.pair, { borderColor: t.line2 }]}>
