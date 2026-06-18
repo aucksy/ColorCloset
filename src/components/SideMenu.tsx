@@ -1,0 +1,153 @@
+import { useRouter } from 'expo-router';
+import { type ReactNode } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, SlideInLeft, SlideOutLeft } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { uniStats, skinObj } from '@/engine';
+import { Icon, type IconName } from '@/components/Icon';
+import { useStore } from '@/store/useStore';
+import { useUiStore } from '@/store/uiStore';
+import { fonts } from '@/theme/fonts';
+import { useTheme } from '@/theme/useTheme';
+
+export function SideMenu() {
+  const t = useTheme();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const open = useUiStore((s) => s.drawerOpen);
+  const closeDrawer = useUiStore((s) => s.closeDrawer);
+  const openPanel = useUiStore((s) => s.openPanel);
+  const showToast = useUiStore((s) => s.showToast);
+
+  const theme = useStore((s) => s.theme);
+  const toggleTheme = useStore((s) => s.toggleTheme);
+  const saved = useStore((s) => s.saved.length);
+  const tops = useStore((s) => s.tops);
+  const bottoms = useStore((s) => s.bottoms);
+  const depth = useStore((s) => s.depth);
+  const undertone = useStore((s) => s.undertone);
+  const worn = useStore((s) => s.worn);
+  const resetWardrobe = useStore((s) => s.resetWardrobe);
+
+  const { total, worn: wornCount } = uniStats(tops, bottoms, skinObj(depth, undertone), worn);
+
+  if (!open) return null;
+
+  const setupAgain = () => {
+    closeDrawer();
+    router.replace('/onboarding');
+  };
+  const reset = () => {
+    Alert.alert('Reset wardrobe?', 'This clears your colours, saved looks and worn history.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reset',
+        style: 'destructive',
+        onPress: () => {
+          resetWardrobe();
+          closeDrawer();
+          router.replace('/onboarding');
+        },
+      },
+    ]);
+  };
+
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Animated.View entering={FadeIn.duration(250)} exiting={FadeOut.duration(250)} style={styles.scrimWrap}>
+        <Pressable style={[StyleSheet.absoluteFill, styles.scrim]} onPress={closeDrawer} />
+      </Animated.View>
+      <Animated.View
+        entering={SlideInLeft.duration(320)}
+        exiting={SlideOutLeft.duration(280)}
+        style={[styles.sheet, { backgroundColor: t.surface, borderRightColor: t.line, paddingTop: insets.top + 22, paddingBottom: insets.bottom + 4 }]}
+      >
+        <View style={styles.brand}>
+          <Brand />
+          <Text style={[styles.brandTxt, { color: t.ink, fontFamily: fonts.uiBold }]}>ColorCloset</Text>
+        </View>
+
+        <Item t={t} icon="setup" label="Set up again" onPress={setupAgain} />
+        <Item t={t} icon="list" label="My combinations" onPress={() => openPanel('combos')} right={`${wornCount}/${total}`} />
+        <Item t={t} icon="bookmark" label="Saved looks" onPress={() => openPanel('saved')} right={String(saved)} />
+        <Item
+          t={t}
+          icon="tags"
+          label="Label by type"
+          onPress={() => showToast('Label by type — coming in a follow-up')}
+        />
+
+        <Pressable onPress={toggleTheme} style={[styles.item]}>
+          <Icon name={theme === 'dark' ? 'moon' : 'sun'} size={19} color={t.muted} />
+          <Text style={[styles.itemTxt, { color: t.ink, fontFamily: fonts.ui }]}>
+            {theme === 'dark' ? 'Dark mode' : 'Light mode'}
+          </Text>
+          <View style={[styles.switch, { backgroundColor: theme === 'light' ? t.accent : t.track }]}>
+            <View style={[styles.knob, { left: theme === 'light' ? 21 : 3 }]} />
+          </View>
+        </Pressable>
+
+        <View style={[styles.div, { backgroundColor: t.line }]} />
+
+        <Item t={t} icon="info" label="How it works" onPress={() => openPanel('about')} />
+        <Item t={t} icon="reset" label="Reset wardrobe" onPress={reset} />
+
+        <Text style={[styles.foot, { color: t.faint, fontFamily: fonts.uiRegular }]}>
+          One job, done well: what to wear from what you own.
+        </Text>
+      </Animated.View>
+    </View>
+  );
+}
+
+function Brand() {
+  return <View style={styles.mk} />;
+}
+
+function Item({
+  t,
+  icon,
+  label,
+  onPress,
+  right,
+}: {
+  t: ReturnType<typeof useTheme>;
+  icon: IconName;
+  label: string;
+  onPress: () => void;
+  right?: string;
+}) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.item, { opacity: pressed ? 0.6 : 1 }]}>
+      <Icon name={icon} size={19} color={t.muted} />
+      <Text style={[styles.itemTxt, { color: t.ink, fontFamily: fonts.ui }]}>{label}</Text>
+      {right != null && <Text style={[styles.right, { color: t.muted, fontFamily: fonts.uiSemi }]}>{right}</Text>}
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  scrimWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50 },
+  scrim: { backgroundColor: 'rgba(5,5,8,0.5)' },
+  sheet: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: '80%',
+    maxWidth: 320,
+    zIndex: 60,
+    borderRightWidth: 1,
+    paddingHorizontal: 18,
+  },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, paddingBottom: 22 },
+  mk: { width: 30, height: 30, borderRadius: 9, backgroundColor: '#C9A86A' },
+  brandTxt: { fontSize: 17 },
+  item: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 12, borderRadius: 14 },
+  itemTxt: { fontSize: 14.5 },
+  right: { marginLeft: 'auto', fontSize: 12 },
+  switch: { marginLeft: 'auto', width: 42, height: 24, borderRadius: 99, justifyContent: 'center' },
+  knob: { position: 'absolute', top: 3, width: 18, height: 18, borderRadius: 9, backgroundColor: '#fff' },
+  div: { height: 1, marginVertical: 10, marginHorizontal: 6 },
+  foot: { marginTop: 'auto', paddingHorizontal: 8, paddingVertical: 14, fontSize: 11, lineHeight: 17 },
+});
