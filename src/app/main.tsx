@@ -1,5 +1,6 @@
-import { useLayoutEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect, useLayoutEffect, useState } from 'react';
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CLOTH, OCC, STYLES, skinObj, uniStats, type Occasion, type StyleName, type TypeFilter } from '@/engine';
@@ -41,7 +42,6 @@ export default function Main() {
   const tops = useStore((s) => s.tops);
   const bottoms = useStore((s) => s.bottoms);
   const depth = useStore((s) => s.depth);
-  const undertone = useStore((s) => s.undertone);
   const worn = useStore((s) => s.worn);
   const regenerate = useStore((s) => s.regenerate);
   const another = useStore((s) => s.another);
@@ -51,6 +51,9 @@ export default function Main() {
 
   const openDrawer = useUiStore((s) => s.openDrawer);
   const openPanel = useUiStore((s) => s.openPanel);
+  const closePanel = useUiStore((s) => s.closePanel);
+  const drawerOpen = useUiStore((s) => s.drawerOpen);
+  const closeDrawer = useUiStore((s) => s.closeDrawer);
   const showToast = useUiStore((s) => s.showToast);
   const panel = useUiStore((s) => s.panel);
 
@@ -61,7 +64,23 @@ export default function Main() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const skin = skinObj(depth, undertone);
+  // Android back: close an open overlay first; otherwise let the OS exit.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (panel) {
+        closePanel();
+        return true;
+      }
+      if (drawerOpen) {
+        closeDrawer();
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [panel, drawerOpen, closePanel, closeDrawer]);
+
+  const skin = skinObj(depth);
   const { total, worn: wornCount } = uniStats(tops, bottoms, skin, worn);
   const hasTags = Object.keys(types).some((k) => (types[k]?.length ?? 0) > 0);
   const isSaved = !!current && saved.some((x) => x.t === current.t && x.b === current.b);
@@ -99,16 +118,7 @@ export default function Main() {
           <Logo size={24} />
           <Text style={[styles.brandTxt, { color: t.ink, fontFamily: fonts.uiBold }]}>ColorCloset</Text>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Edit skin tone"
-          onPress={() => openPanel('skin')}
-          style={[styles.pill, { backgroundColor: t.glass, borderColor: t.line }]}
-        >
-          <View style={[styles.pillDot, { backgroundColor: skin.dot }]} />
-          <Text style={[styles.pillTxt, { color: t.muted, fontFamily: fonts.uiSemi }]}>{skin.name}</Text>
-          <Icon name="pencil" size={11} color={t.faint} />
-        </Pressable>
+        <View style={{ width: 40 }} />
       </View>
 
       <View style={{ paddingHorizontal: 18, marginTop: 6 }}>
@@ -116,7 +126,7 @@ export default function Main() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 14, paddingBottom: insets.bottom + 30 }}
+        contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 14, paddingBottom: insets.bottom + 100 }}
         showsVerticalScrollIndicator={false}
       >
         {pane === 'rec' ? (
@@ -167,7 +177,6 @@ export default function Main() {
                     <Icon name="bookmark" size={20} color={isSaved ? t.accent : t.ink} />
                   </Pressable>
                   <Button title="Mark it worn" onPress={onWore} style={{ flex: 1 }} icon={<Icon name="check" size={18} color={t.onGold} strokeWidth={3} />} />
-                  <Button title="Another" variant="ghost" onPress={onAnother} style={{ flex: 1 }} icon={<Icon name="refresh" size={18} color={t.ink} />} />
                 </View>
               </>
             ) : (
@@ -198,6 +207,20 @@ export default function Main() {
         )}
       </ScrollView>
 
+      {/* floating "next look" button — browse through the looks */}
+      {pane === 'rec' && current && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Next look"
+          onPress={onAnother}
+          style={({ pressed }) => [styles.fab, { bottom: insets.bottom + 22, transform: [{ scale: pressed ? 0.93 : 1 }] }]}
+        >
+          <LinearGradient colors={t.goldGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fabFill}>
+            <Icon name="refresh" size={26} color={t.onGold} strokeWidth={2.4} />
+          </LinearGradient>
+        </Pressable>
+      )}
+
       {/* overlays */}
       {panel === 'skin' && <SkinPanel />}
       {panel === 'about' && <AboutPanel />}
@@ -216,9 +239,6 @@ const styles = StyleSheet.create({
   hamb: { width: 40, height: 40, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   brandTxt: { fontSize: 15 },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingLeft: 7, paddingRight: 11, borderRadius: 99, borderWidth: 1 },
-  pillDot: { width: 14, height: 14, borderRadius: 7 },
-  pillTxt: { fontSize: 11 },
   chLabel: { fontSize: 10, letterSpacing: 1.6, marginTop: 14, marginBottom: 7 },
   prog: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 14, marginBottom: 6 },
   progLabel: { borderWidth: 1, borderRadius: 99, paddingVertical: 7, paddingHorizontal: 13 },
@@ -230,4 +250,18 @@ const styles = StyleSheet.create({
   emptyH: { fontSize: 19, marginBottom: 7, textAlign: 'center' },
   emptyP: { fontSize: 13, lineHeight: 20, textAlign: 'center', maxWidth: 250 },
   emptyBtn: { alignSelf: 'stretch', paddingHorizontal: 50, marginTop: 18 },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  fabFill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

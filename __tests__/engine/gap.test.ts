@@ -1,6 +1,6 @@
 import { gapSuggestions, skinObj } from '../../src/engine';
 
-const skin = skinObj('medium', 'neutral');
+const skin = skinObj('medium');
 
 describe('gapSuggestions ("what to buy", threshold 0.62)', () => {
   const { asTops, asBottoms } = gapSuggestions(['White'], ['Navy'], skin);

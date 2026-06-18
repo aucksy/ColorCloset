@@ -22,7 +22,6 @@ import {
   type Occasion,
   type ShadeIndex,
   type StyleName,
-  type ToneId,
   type TypeFilter,
 } from '@/engine';
 import { todayStr } from '@/lib/date';
@@ -44,7 +43,6 @@ type Slot = 'tops' | 'bottoms';
 
 interface PersistedState {
   depth: DepthId | null;
-  undertone: ToneId;
   tops: ColorKey[];
   bottoms: ColorKey[];
   shadeTops: Record<ColorKey, ShadeIndex>;
@@ -69,10 +67,11 @@ interface SessionState {
 interface Actions {
   // profile
   setDepth: (d: DepthId) => void;
-  setUndertone: (t: ToneId) => void;
   // wardrobe
   toggleColor: (slot: Slot, key: ColorKey) => void;
+  setColors: (slot: Slot, colors: ColorKey[]) => void;
   setShade: (slot: Slot, key: ColorKey, idx: ShadeIndex) => void;
+  addTypeToColors: (colors: ColorKey[], type: ClothType) => void;
   // deck walk
   regenerate: () => boolean;
   another: () => boolean;
@@ -109,7 +108,6 @@ const SESSION_DEFAULTS: SessionState = {
 
 const PERSISTED_DEFAULTS: PersistedState = {
   depth: null,
-  undertone: 'neutral',
   tops: [],
   bottoms: [],
   shadeTops: {},
@@ -132,10 +130,6 @@ export const useStore = create<Store>()(
         set({ depth: d });
         if (get().setupComplete) get().regenerate();
       },
-      setUndertone: (t) => {
-        set({ undertone: t });
-        if (get().setupComplete) get().regenerate();
-      },
 
       toggleColor: (slot, key) => {
         const s = get();
@@ -149,6 +143,29 @@ export const useStore = create<Store>()(
         const shades = { ...s[shadeField] };
         if (adding && shades[key] == null) shades[key] = 2;
         set({ [slot]: next, [shadeField]: shades } as Partial<Store>);
+      },
+
+      setColors: (slot, colors) => {
+        const s = get();
+        const setK = new Set(colors);
+        const next = KEYS.filter((k) => setK.has(k)); // canonical order
+        const shadeField = slot === 'tops' ? 'shadeTops' : 'shadeBottoms';
+        const shades = { ...s[shadeField] };
+        next.forEach((k) => {
+          if (shades[k] == null) shades[k] = 2;
+        });
+        set({ [slot]: next, [shadeField]: shades } as Partial<Store>);
+      },
+
+      addTypeToColors: (colors, type) => {
+        const s = get();
+        const types = { ...s.types };
+        colors.forEach((c) => {
+          const tagged = new Set(types[c] ?? []);
+          tagged.add(type);
+          types[c] = [...tagged];
+        });
+        set({ types });
       },
 
       setShade: (slot, key, idx) => {
@@ -168,7 +185,7 @@ export const useStore = create<Store>()(
 
       another: () => {
         const s = get();
-        const skin = skinObj(s.depth, s.undertone);
+        const skin = skinObj(s.depth);
         const deck = buildDeck({
           tops: s.tops,
           bottoms: s.bottoms,
@@ -269,7 +286,6 @@ export const useStore = create<Store>()(
       storage: createJSONStorage(() => activeStorage),
       partialize: (s): PersistedState => ({
         depth: s.depth,
-        undertone: s.undertone,
         tops: s.tops,
         bottoms: s.bottoms,
         shadeTops: s.shadeTops,

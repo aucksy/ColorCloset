@@ -1,9 +1,10 @@
 /**
- * Skin-tone model: depth ladder, undertone, and the "flatter set" derivation.
+ * Skin-tone model — DEPTH ONLY (undertone removed). The flatter sets fold in a
+ * warm / olive / deep bias appropriate for South-Asian skin (Medium→Rich), based
+ * on India-tuned colour-analysis research, mapped onto the existing 16 colours.
  * Used softly to rank combinations; never excludes a colour.
- * Ported verbatim from the prototype (lines ~622-653, 891-895, §9.4).
  */
-import type { ColorKey, DepthId, SkinObj, ToneId } from './types';
+import type { ColorKey, DepthId, SkinObj } from './types';
 
 export const DEPTHS: { id: DepthId; name: string; dot: string }[] = [
   { id: 'fair', name: 'Fair', dot: '#F3DBC8' },
@@ -14,65 +15,51 @@ export const DEPTHS: { id: DepthId; name: string; dot: string }[] = [
   { id: 'rich', name: 'Rich', dot: '#5C3B23' },
 ];
 
-export const TONES: { id: ToneId; name: string }[] = [
-  { id: 'cool', name: 'Cool' },
-  { id: 'neutral', name: 'Neutral' },
-  { id: 'warm', name: 'Warm' },
-  { id: 'olive', name: 'Olive' },
-];
-
-/** Base flattering colours by undertone (the stronger signal). */
-export const TONE_FLATTER: Record<ToneId, ColorKey[]> = {
-  cool: ['Navy', 'Charcoal', 'Burgundy', 'Blue', 'Grey', 'Purple', 'Forest Green', 'White'],
-  neutral: ['Navy', 'White', 'Grey', 'Burgundy', 'Blue', 'Olive', 'Beige', 'Charcoal'],
-  warm: ['Cream', 'Beige', 'Olive', 'Rust', 'Mustard', 'Khaki', 'Forest Green', 'White'],
-  olive: ['White', 'Cream', 'Burgundy', 'Rust', 'Forest Green', 'Charcoal', 'Navy', 'Mustard'],
-};
-
-const TONE_WORD: Record<ToneId, string> = {
-  cool: 'Cool, jewel and deep tones',
-  neutral: 'Clean contrasts and balanced tones',
-  warm: 'Warm, earthy shades',
-  olive: 'Rich earthy and jewel tones',
-};
-
 /**
- * Flatter set from undertone (primary) adjusted by depth (contrast), capped at 9.
- * Deep/Rich add high-contrast pops; Fair/Light add deeper anchors.
+ * Colours that tend to flatter each depth (warm/jewel/deep bias). Fair/Light get
+ * jewel tones + deep anchors for contrast; Medium→Rich lean into warm earth +
+ * saturated jewel tones and crisp whites; ashy/icy/muddy tones are kept out.
  */
-export function flatterFor(depth: DepthId | null | undefined, tone: ToneId): ColorKey[] {
-  const list = (TONE_FLATTER[tone] || TONE_FLATTER.neutral).slice();
-  if (depth === 'deep' || depth === 'rich') {
-    ['White', 'Light Blue', 'Mustard', 'Rust'].forEach((c) => {
-      if (!list.includes(c)) list.push(c);
-    });
-  }
-  if (depth === 'fair' || depth === 'light') {
-    ['Navy', 'Burgundy', 'Charcoal', 'Forest Green'].forEach((c) => {
-      if (!list.includes(c)) list.push(c);
-    });
-  }
-  return list.slice(0, 9);
+const DEPTH_FLATTER: Record<DepthId, ColorKey[]> = {
+  fair: ['Navy', 'Burgundy', 'Forest Green', 'Purple', 'Blue', 'Charcoal', 'Olive', 'White'],
+  light: ['Mustard', 'Navy', 'Burgundy', 'Rust', 'Blue', 'Forest Green', 'Purple', 'Olive'],
+  medium: ['Mustard', 'Rust', 'Forest Green', 'Burgundy', 'Olive', 'Purple', 'Cream', 'Khaki'],
+  tan: ['Rust', 'Mustard', 'Burgundy', 'Forest Green', 'Olive', 'Khaki', 'Cream', 'Blue'],
+  deep: ['Purple', 'Forest Green', 'Burgundy', 'Mustard', 'Blue', 'White', 'Rust', 'Navy'],
+  rich: ['White', 'Purple', 'Forest Green', 'Mustard', 'Blue', 'Burgundy', 'Navy', 'Light Blue'],
+};
+
+const DEPTH_WORD: Record<DepthId, string> = {
+  fair: 'Jewel tones and deep anchors',
+  light: 'Warm brights and jewel tones',
+  medium: 'Warm, earthy and jewel tones',
+  tan: 'Rich earthy and saturated jewel tones',
+  deep: 'Bold saturated tones and crisp whites',
+  rich: 'High-saturation brights and crisp contrast',
+};
+
+/** Flatter set for a depth (max 9). */
+export function flatterFor(depth: DepthId | null | undefined): ColorKey[] {
+  const d = depth ?? 'medium';
+  return (DEPTH_FLATTER[d] ?? DEPTH_FLATTER.medium).slice(0, 9);
 }
 
-/** One-line plain-language note describing what tends to flatter the selection. */
-export function skinNote(depth: DepthId | null | undefined, tone: ToneId): string {
-  const d = (DEPTHS.find((x) => x.id === depth) || { name: 'your' }).name.toLowerCase();
-  return `${TONE_WORD[tone] || 'Balanced tones'} tend to flatter ${d}, ${tone} skin — used softly to rank your combinations.`;
-}
-
-/** Resolve a full skin profile. depth null -> Medium; tone defaults to neutral. */
-export function skinObj(depth: DepthId | null | undefined, tone: ToneId | null | undefined): SkinObj {
+/** One-line plain-language note describing what tends to flatter the selected depth. */
+export function skinNote(depth: DepthId | null | undefined): string {
   const d = DEPTHS.find((x) => x.id === depth) || DEPTHS[2];
-  const t = TONES.find((x) => x.id === tone) || TONES[1];
+  return `${DEPTH_WORD[d.id]} tend to flatter ${d.name.toLowerCase()} skin — used softly to rank your combinations.`;
+}
+
+/** Resolve a full skin profile. depth null -> Medium. */
+export function skinObj(depth: DepthId | null | undefined): SkinObj {
+  const d = DEPTHS.find((x) => x.id === depth) || DEPTHS[2];
   return {
-    id: d.id + '-' + t.id,
+    id: d.id,
     depth: d.id,
-    tone: t.id,
-    name: d.name + ' · ' + t.name,
+    name: d.name,
     short: d.name,
     dot: d.dot,
-    flatter: flatterFor(d.id, t.id),
-    note: skinNote(d.id, t.id),
+    flatter: flatterFor(d.id),
+    note: skinNote(d.id),
   };
 }

@@ -7,11 +7,8 @@
 /** One of the 16 named colours (e.g. "Navy", "Burgundy"). */
 export type ColorKey = string;
 
-/** Skin depth ladder, lightest -> deepest. */
+/** Skin depth ladder, lightest -> deepest. Drives the (depth-only) flatter sets. */
 export type DepthId = 'fair' | 'light' | 'medium' | 'tan' | 'deep' | 'rich';
-
-/** Skin undertone bias. Neutral is the implicit default. */
-export type ToneId = 'cool' | 'neutral' | 'warm' | 'olive';
 
 /** Visual-risk axis, independent of occasion. */
 export type StyleName = 'Minimal' | 'Classic' | 'Bold' | 'Statement';
@@ -20,7 +17,7 @@ export type StyleName = 'Minimal' | 'Classic' | 'Bold' | 'Statement';
 export type Occasion = 'Everyday' | 'Office' | 'Date night' | 'Party' | 'Travel';
 
 /** Optional clothing-context tags. */
-export type ClothType = 'casual' | 'formal' | 'gym';
+export type ClothType = 'casual' | 'formal' | 'gym' | 'ethnic';
 
 /** "All" plus the three cloth types, used by the Style-me "For" filter. */
 export type TypeFilter = 'all' | ClothType;
@@ -39,15 +36,14 @@ export interface ColorEntry {
   shades: string[];
 }
 
-/** Resolved skin profile used by scoring. */
+/** Resolved skin profile used by scoring (depth-only; undertone removed). */
 export interface SkinObj {
   id: string;
   depth: DepthId;
-  tone: ToneId;
   name: string;
   short: string;
   dot: string;
-  /** Colours that tend to flatter this skin (max 9). */
+  /** Colours that tend to flatter this skin depth (max 9). */
   flatter: ColorKey[];
   note: string;
 }

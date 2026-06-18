@@ -8,7 +8,7 @@ import {
   type RankedCombo,
 } from '../../src/engine';
 
-const skin = skinObj('medium', 'neutral');
+const skin = skinObj('medium');
 
 describe('comboUniverse (threshold 0.55 + fallback)', () => {
   it('includes pairings at/above the threshold', () => {

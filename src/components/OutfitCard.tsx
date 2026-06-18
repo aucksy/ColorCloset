@@ -16,14 +16,13 @@ export function OutfitCard() {
   const occasion = useStore((s) => s.occasion);
   const style = useStore((s) => s.style);
   const depth = useStore((s) => s.depth);
-  const undertone = useStore((s) => s.undertone);
   const shadeTops = useStore((s) => s.shadeTops);
   const shadeBottoms = useStore((s) => s.shadeBottoms);
   const worn = useStore((s) => s.worn);
 
   if (!current) return null;
   const { t: topK, b: botK } = current;
-  const skin = skinObj(depth, undertone);
+  const skin = skinObj(depth);
   const catLabel = style ? style.toUpperCase() : catFor(topK, botK);
   const topHex = shadeHex(topK, shadeTops[topK]);
   const botHex = shadeHex(botK, shadeBottoms[botK]);
@@ -61,7 +60,7 @@ export function OutfitCard() {
           <View style={[styles.pill, { backgroundColor: 'rgba(201,168,106,0.10)', borderColor: 'rgba(201,168,106,0.22)' }]}>
             <Icon name="star" size={13} color={t.accent} />
             <Text style={[styles.pillTxt, { color: t.accent, fontFamily: fonts.uiSemi }]}>
-              Flatters your {skin.short.toLowerCase()} tone
+              Flatters your {skin.short.toLowerCase()} skin
             </Text>
           </View>
         )}

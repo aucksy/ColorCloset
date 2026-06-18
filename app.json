@@ -45,6 +45,13 @@
             "enableShrinkResourcesInReleaseBuilds": true
           }
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "ColorCloset reads the colours in your clothes from photos you take.",
+          "photosPermission": "ColorCloset reads the colours in your clothes from photos you choose."
+        }
       ]
     ],
     "experiments": {

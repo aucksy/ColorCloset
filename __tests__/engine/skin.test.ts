@@ -1,43 +1,41 @@
 import { flatterFor, skinObj, skinNote } from '../../src/engine';
 
-describe('flatterFor (§9.4)', () => {
-  it('returns the undertone base set when depth adds nothing', () => {
-    expect(flatterFor('medium', 'neutral')).toEqual([
-      'Navy', 'White', 'Grey', 'Burgundy', 'Blue', 'Olive', 'Beige', 'Charcoal',
+describe('flatterFor (depth-only, India-tuned, §9.4)', () => {
+  it('returns the Medium depth set', () => {
+    expect(flatterFor('medium')).toEqual([
+      'Mustard', 'Rust', 'Forest Green', 'Burgundy', 'Olive', 'Purple', 'Cream', 'Khaki',
     ]);
   });
 
-  it('deep/rich add high-contrast pops, capped at 9', () => {
-    const list = flatterFor('deep', 'cool');
-    expect(list).toHaveLength(9);
-    expect(list).toContain('Light Blue'); // added (White already present)
-    expect(list).not.toContain('Mustard'); // pushed past the 9-cap
+  it('Fair leans on jewel tones + deep anchors', () => {
+    const list = flatterFor('fair');
+    expect(list).toContain('Navy');
+    expect(list).toContain('Purple');
+    expect(list.length).toBeLessThanOrEqual(9);
   });
 
-  it('fair/light add deeper anchors, capped at 9', () => {
-    const list = flatterFor('fair', 'warm');
-    expect(list).toHaveLength(9);
-    expect(list).toContain('Navy'); // added
-    expect(list).not.toContain('Burgundy'); // past the cap
+  it('Deep/Rich include crisp white and saturated brights', () => {
+    expect(flatterFor('deep')).toContain('White');
+    expect(flatterFor('rich')).toContain('White');
+    expect(flatterFor('rich')).toContain('Mustard');
   });
 
-  it('unknown undertone falls back to neutral', () => {
-    expect(flatterFor('medium', 'neutral')).toEqual(flatterFor(undefined as any, 'neutral'));
+  it('defaults to Medium when depth is missing', () => {
+    expect(flatterFor(undefined)).toEqual(flatterFor('medium'));
   });
 });
 
 describe('skinObj', () => {
   it('defaults null depth to Medium and resolves the flatter set', () => {
-    const s = skinObj(null, 'neutral');
+    const s = skinObj(null);
     expect(s.depth).toBe('medium');
-    expect(s.tone).toBe('neutral');
     expect(s.short).toBe('Medium');
-    expect(s.flatter).toEqual(flatterFor('medium', 'neutral'));
+    expect(s.flatter).toEqual(flatterFor('medium'));
   });
 });
 
 describe('skinNote', () => {
-  it('produces a plain-language note', () => {
-    expect(skinNote('fair', 'cool')).toContain('fair, cool skin');
+  it('produces a plain-language, depth-based note', () => {
+    expect(skinNote('fair')).toContain('fair skin');
   });
 });

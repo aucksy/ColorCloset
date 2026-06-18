@@ -95,7 +95,6 @@ export function deckKey(ctx: DeckContext): string {
     ctx.occ,
     ctx.style,
     ctx.skin?.depth ?? '',
-    ctx.skin?.tone ?? '',
     ctx.typeFilter,
     ctx.tops.join(','),
     ctx.bottoms.join(','),

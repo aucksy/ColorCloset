@@ -8,7 +8,7 @@ import { buildDeck, comboUniverse, gapSuggestions, skinObj } from '../../src/eng
 // The prototype's SAMPLE_TOPS / SAMPLE_BOTTOMS fallback wardrobes (prototype lines 744-745).
 const SAMPLE_TOPS = ['White', 'Light Blue', 'Navy', 'Black', 'Grey', 'Olive', 'Burgundy', 'Beige'];
 const SAMPLE_BOTTOMS = ['Beige', 'Navy', 'Grey', 'Black', 'Blue', 'Cream', 'Charcoal', 'Khaki'];
-const skin = skinObj('medium', 'neutral'); // prototype defaults
+const skin = skinObj('medium'); // prototype defaults
 
 const round = (n: number) => Math.round(n * 1e4) / 1e4;
 

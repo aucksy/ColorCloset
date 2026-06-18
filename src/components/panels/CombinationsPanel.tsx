@@ -16,14 +16,13 @@ export function CombinationsPanel() {
   const tops = useStore((s) => s.tops);
   const bottoms = useStore((s) => s.bottoms);
   const depth = useStore((s) => s.depth);
-  const undertone = useStore((s) => s.undertone);
   const worn = useStore((s) => s.worn);
   const shadeTops = useStore((s) => s.shadeTops);
   const shadeBottoms = useStore((s) => s.shadeBottoms);
   const loadCombo = useStore((s) => s.loadCombo);
   const clearWorn = useStore((s) => s.clearWorn);
 
-  const { uni, total, worn: wornCount } = uniStats(tops, bottoms, skinObj(depth, undertone), worn);
+  const { uni, total, worn: wornCount } = uniStats(tops, bottoms, skinObj(depth), worn);
   const notWorn = uni.filter((c) => !worn[c.id]);
   const did = uni.filter((c) => worn[c.id]);
 

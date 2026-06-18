@@ -16,35 +16,45 @@ export const OCC_PHRASE: Record<Occasion, string> = {
 
 export const STYLES: StyleName[] = ['Minimal', 'Classic', 'Bold', 'Statement'];
 
-/** Curated exemplar pairings per style (top/bottom interchangeable). Appendix B. */
+/**
+ * Curated exemplar pairings per style (top/bottom interchangeable), retuned with an
+ * India sensibility (jewel + warm-earth combinations, gold/neutral-bridged), kept
+ * within the existing 16 colours. New-colour research suggestions are mapped to the
+ * closest existing colour (Teal/Emerald→Forest Green, Maroon→Burgundy,
+ * Marigold→Mustard, Rani Pink→Purple).
+ */
 export const GOOD: Record<StyleName, [string, string][]> = {
   Minimal: [
-    ['White', 'Grey'],
-    ['Beige', 'Cream'],
-    ['Black', 'Grey'],
-    ['White', 'Beige'],
+    ['White', 'Navy'],
+    ['Cream', 'Olive'],
+    ['Beige', 'Khaki'],
     ['Grey', 'Charcoal'],
+    ['Light Blue', 'Navy'],
+    ['White', 'Charcoal'],
   ],
   Classic: [
     ['White', 'Navy'],
     ['Light Blue', 'Charcoal'],
-    ['White', 'Grey'],
-    ['Navy', 'Beige'],
-    ['Blue', 'Grey'],
+    ['Cream', 'Forest Green'],
+    ['White', 'Burgundy'],
+    ['Beige', 'Navy'],
+    ['Grey', 'Navy'],
   ],
   Bold: [
-    ['Burgundy', 'Grey'],
-    ['Olive', 'Beige'],
     ['Mustard', 'Navy'],
-    ['Forest Green', 'Cream'],
-    ['Rust', 'Charcoal'],
+    ['Rust', 'Forest Green'],
+    ['Burgundy', 'Grey'],
+    ['Blue', 'Mustard'],
+    ['Olive', 'Beige'],
+    ['Purple', 'Mustard'],
   ],
   Statement: [
+    ['Purple', 'Mustard'],
+    ['Mustard', 'Burgundy'],
+    ['Forest Green', 'Rust'],
+    ['Blue', 'Rust'],
     ['Purple', 'Grey'],
-    ['Olive', 'Cream'],
-    ['Rust', 'Navy'],
     ['Burgundy', 'Beige'],
-    ['Forest Green', 'Khaki'],
   ],
 };
 
@@ -60,11 +70,12 @@ export const GOODSET: Set<string> = (() => {
   return s;
 })();
 
-/** Optional clothing-type tags. */
+/** Optional clothing-type tags (Ethnic/Festive added for Indian wardrobes). */
 export const CLOTH: { id: ClothType; name: string }[] = [
   { id: 'casual', name: 'Casual' },
   { id: 'formal', name: 'Formal' },
   { id: 'gym', name: 'Gym' },
+  { id: 'ethnic', name: 'Ethnic' },
 ];
 
 /** Tunable thresholds (§9.9). Exact prototype values — the starting tuning. */

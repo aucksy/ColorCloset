@@ -24,11 +24,10 @@ export function SideMenu() {
   const tops = useStore((s) => s.tops);
   const bottoms = useStore((s) => s.bottoms);
   const depth = useStore((s) => s.depth);
-  const undertone = useStore((s) => s.undertone);
   const worn = useStore((s) => s.worn);
   const resetWardrobe = useStore((s) => s.resetWardrobe);
 
-  const { total, worn: wornCount } = uniStats(tops, bottoms, skinObj(depth, undertone), worn);
+  const { total, worn: wornCount } = uniStats(tops, bottoms, skinObj(depth), worn);
 
   if (!open) return null;
 
@@ -67,6 +66,7 @@ export function SideMenu() {
         </View>
 
         <Item t={t} icon="setup" label="Set up again" onPress={setupAgain} />
+        <Item t={t} icon="pencil" label="Skin tone" onPress={() => openPanel('skin')} />
         <Item t={t} icon="list" label="My combinations" onPress={() => openPanel('combos')} right={`${wornCount}/${total}`} />
         <Item t={t} icon="bookmark" label="Saved looks" onPress={() => openPanel('saved')} right={String(saved)} />
         <Item t={t} icon="tags" label="Label by type" onPress={() => openPanel('types')} />

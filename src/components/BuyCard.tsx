@@ -33,7 +33,7 @@ export function BuyCard({ suggestion, slot, index }: Props) {
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={[styles.name, { color: t.ink, fontFamily: fonts.display }]}>{c}</Text>
           <Text style={[styles.meta, { color: t.muted, fontFamily: fonts.uiRegular }]}>
-            {fl && <Text style={{ color: t.accent, fontFamily: fonts.uiBold }}>flatters your tone · </Text>}
+            {fl && <Text style={{ color: t.accent, fontFamily: fonts.uiBold }}>flatters you · </Text>}
             {pairs.length} new look{pairs.length > 1 ? 's' : ''}
           </Text>
         </View>

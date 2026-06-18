@@ -12,9 +12,8 @@ export function WhatToBuyPane() {
   const tops = useStore((s) => s.tops);
   const bottoms = useStore((s) => s.bottoms);
   const depth = useStore((s) => s.depth);
-  const undertone = useStore((s) => s.undertone);
 
-  const { asTops, asBottoms } = gapSuggestions(tops, bottoms, skinObj(depth, undertone));
+  const { asTops, asBottoms } = gapSuggestions(tops, bottoms, skinObj(depth));
   const empty = asTops.length === 0 && asBottoms.length === 0;
 
   return (
