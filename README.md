@@ -7,7 +7,7 @@ outfit **colour combinations** from the colours you own — ranked by colour har
 what flatters your skin tone, occasion, and a style lean. Ported from the validated
 web prototype in `../Product Docs/`.
 
-## Status — Pass 1: Foundation + Core Loop
+## Status — Passes 1–2: full v1 experience
 
 **Built & verified**
 
@@ -23,13 +23,22 @@ web prototype in `../Product Docs/`.
 - **Style Me core loop** — outfit card (animated garment silhouettes, name, "why this
   works", flatter + last-worn pills), Occasion & Style chip rows, **Another** /
   **Save** / **Mark it worn**, and a "Worn X of Y" progress indicator.
+- **What to buy** — the gap-engine UI: ranked colours to add as tops/bottoms, each
+  card showing the exact existing pieces (and outfit previews) the new colour unlocks.
+- **Label by type** — tag colours casual/formal/gym; a "For" filter then narrows the
+  Style Me walk (untagged colours always pass).
 - **Side menu + panels** — skin-tone picker, combinations list, saved looks,
   how-it-works, dark/light theme toggle (dark default), set-up-again, reset wardrobe.
 - **Local persistence** (AsyncStorage via a swappable storage adapter — MMKV-ready).
+- **Fluid motion** — outfit cross-fade with garment colour-morph, pane fades, animated
+  progress, staggered buy-cards, onboarding step fades; all honour reduce-motion.
+- **Smaller APK** — only the used font weights are bundled, and native libraries are
+  built for `arm64-v8a` only (see `plugins/withAndroidAbiFilter.js`).
 
-**Deferred to follow-up passes** — the "What to buy" gap UI (engine is built/tested),
-clothing-type tagging + the "For" filter, on-device photo extraction (v1.1),
-worn-photo history, outerwear slot, analytics.
+**Deferred to follow-up passes** — on-device photo extraction (v1.1), worn-photo
+history, outerwear slot, analytics, the optional MMKV storage swap, and ProGuard/R8
+minification (runtime-test before enabling). For a Play Store release, build the
+`production` profile (an `.aab`), which makes the arm64-only filter unnecessary.
 
 ## Running it
 
