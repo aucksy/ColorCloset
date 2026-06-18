@@ -17,7 +17,6 @@ export function SideMenu() {
   const open = useUiStore((s) => s.drawerOpen);
   const closeDrawer = useUiStore((s) => s.closeDrawer);
   const openPanel = useUiStore((s) => s.openPanel);
-  const showToast = useUiStore((s) => s.showToast);
 
   const theme = useStore((s) => s.theme);
   const toggleTheme = useStore((s) => s.toggleTheme);
@@ -70,12 +69,7 @@ export function SideMenu() {
         <Item t={t} icon="setup" label="Set up again" onPress={setupAgain} />
         <Item t={t} icon="list" label="My combinations" onPress={() => openPanel('combos')} right={`${wornCount}/${total}`} />
         <Item t={t} icon="bookmark" label="Saved looks" onPress={() => openPanel('saved')} right={String(saved)} />
-        <Item
-          t={t}
-          icon="tags"
-          label="Label by type"
-          onPress={() => showToast('Label by type — coming in a follow-up')}
-        />
+        <Item t={t} icon="tags" label="Label by type" onPress={() => openPanel('types')} />
 
         <Pressable onPress={toggleTheme} style={[styles.item]}>
           <Icon name={theme === 'dark' ? 'moon' : 'sun'} size={19} color={t.muted} />

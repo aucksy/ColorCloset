@@ -1,7 +1,9 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useMotion } from '@/theme/useMotion';
 import { TONES, comboUniverse, skinNote, skinObj, type ToneId } from '@/engine';
 import { BuildingOverlay } from '@/components/BuildingOverlay';
 import { Button } from '@/components/Button';
@@ -17,6 +19,7 @@ export default function Onboarding() {
   const t = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const motion = useMotion();
   const [step, setStep] = useState(0);
   const [building, setBuilding] = useState(false);
 
@@ -71,6 +74,7 @@ export default function Onboarding() {
       </View>
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+        <Animated.View key={step} entering={FadeInDown.duration(motion.base)}>
         <Text style={[styles.eyebrow, { color: t.accent, fontFamily: fonts.mono }]}>
           {eyebrow.toUpperCase()}
         </Text>
@@ -126,6 +130,7 @@ export default function Onboarding() {
             </View>
           </>
         )}
+        </Animated.View>
       </ScrollView>
 
       <View style={[styles.foot, { paddingBottom: insets.bottom + 18 }]}>

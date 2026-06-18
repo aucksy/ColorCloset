@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CLOTH, OCC, STYLES, skinObj, uniStats, type Occasion, type StyleName, type TypeFilter } from '@/engine';
 import { Button } from '@/components/Button';
@@ -10,10 +11,13 @@ import { ProgressBar } from '@/components/ProgressBar';
 import { Segmented, type Pane } from '@/components/Segmented';
 import { SideMenu } from '@/components/SideMenu';
 import { Toast } from '@/components/Toast';
+import { WhatToBuyPane } from '@/components/WhatToBuyPane';
 import { AboutPanel } from '@/components/panels/AboutPanel';
 import { CombinationsPanel } from '@/components/panels/CombinationsPanel';
 import { SavedPanel } from '@/components/panels/SavedPanel';
 import { SkinPanel } from '@/components/panels/SkinPanel';
+import { TypeTaggingPanel } from '@/components/panels/TypeTaggingPanel';
+import { useMotion } from '@/theme/useMotion';
 import { useStore } from '@/store/useStore';
 import { useUiStore } from '@/store/uiStore';
 import { fonts } from '@/theme/fonts';
@@ -22,6 +26,7 @@ import { useTheme } from '@/theme/useTheme';
 export default function Main() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const motion = useMotion();
   const [pane, setPane] = useState<Pane>('rec');
 
   const current = useStore((s) => s.current);
@@ -107,7 +112,7 @@ export default function Main() {
         showsVerticalScrollIndicator={false}
       >
         {pane === 'rec' ? (
-          <>
+          <Animated.View key="rec" entering={FadeIn.duration(motion.fast)}>
             <Text style={[styles.chLabel, { color: t.faint, fontFamily: fonts.mono }]}>OCCASION</Text>
             <ChipRow
               items={OCC.map((o) => ({ value: o as Occasion, label: o }))}
@@ -154,16 +159,11 @@ export default function Main() {
               <Button title="Mark it worn" onPress={onWore} style={{ flex: 1 }} icon={<Icon name="check" size={18} color={t.onGold} strokeWidth={3} />} />
               <Button title="Another" variant="ghost" onPress={onAnother} style={{ flex: 1 }} icon={<Icon name="refresh" size={18} color={t.ink} />} />
             </View>
-          </>
+          </Animated.View>
         ) : (
-          <View style={styles.shop}>
-            <Text style={[styles.eyebrow, { color: t.accent, fontFamily: fonts.mono }]}>SMART ADDITIONS</Text>
-            <Text style={[styles.shopH, { color: t.ink, fontFamily: fonts.display }]}>One piece, more outfits</Text>
-            <Text style={[styles.shopP, { color: t.muted, fontFamily: fonts.uiRegular }]}>
-              The gap engine that finds the single colour to add — ranked by how many new looks it
-              unlocks — is built and tested. Its screen arrives in the next pass.
-            </Text>
-          </View>
+          <Animated.View key="shop" entering={FadeIn.duration(motion.fast)}>
+            <WhatToBuyPane />
+          </Animated.View>
         )}
       </ScrollView>
 
@@ -172,6 +172,7 @@ export default function Main() {
       {panel === 'about' && <AboutPanel />}
       {panel === 'combos' && <CombinationsPanel />}
       {panel === 'saved' && <SavedPanel />}
+      {panel === 'types' && <TypeTaggingPanel />}
       <SideMenu />
       <Toast />
     </View>
@@ -194,8 +195,4 @@ const styles = StyleSheet.create({
   progTxt: { fontSize: 11 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 18, alignItems: 'stretch' },
   iconAct: { width: 56, borderWidth: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  shop: { alignItems: 'center', paddingVertical: 30, paddingHorizontal: 10 },
-  eyebrow: { fontSize: 10, letterSpacing: 2.2, marginBottom: 8 },
-  shopH: { fontSize: 23, marginBottom: 8, textAlign: 'center' },
-  shopP: { fontSize: 13, lineHeight: 21, textAlign: 'center', maxWidth: 300 },
 });

@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { catFor, shadeHex, skinObj, whyFor } from '@/engine';
 import { GarmentSilhouette } from '@/components/GarmentSilhouette';
 import { Icon } from '@/components/Icon';
@@ -28,14 +29,17 @@ export function OutfitCard() {
   const botHex = shadeHex(botK, shadeBottoms[botK]);
   const why = whyFor(topK, botK, occasion, style);
   const flatterHit = skin.flatter.includes(topK) || skin.flatter.includes(botK);
-  const wornDate = worn[`${topK}|${botK}`];
+  const id = `${topK}|${botK}`;
+  const wornDate = worn[id];
 
   return (
     <View style={styles.wrap}>
-      <Text style={[styles.cat, { color: t.accent, fontFamily: fonts.mono }]}>
-        {catLabel} · {occasion.toUpperCase()}
-      </Text>
-      <Text style={[styles.name, { color: t.ink, fontFamily: fonts.display }]}>{name}</Text>
+      <Animated.View key={`hdr-${id}`} entering={FadeInDown.duration(motion.base)} style={styles.center}>
+        <Text style={[styles.cat, { color: t.accent, fontFamily: fonts.mono }]}>
+          {catLabel} · {occasion.toUpperCase()}
+        </Text>
+        <Text style={[styles.name, { color: t.ink, fontFamily: fonts.display }]}>{name}</Text>
+      </Animated.View>
 
       <View style={styles.sils}>
         <View style={styles.sil}>
@@ -51,6 +55,7 @@ export function OutfitCard() {
         </View>
       </View>
 
+      <Animated.View key={`ftr-${id}`} entering={FadeIn.duration(motion.base)} style={styles.center}>
       <View style={styles.pills}>
         {flatterHit && (
           <View style={[styles.pill, { backgroundColor: 'rgba(201,168,106,0.10)', borderColor: 'rgba(201,168,106,0.22)' }]}>
@@ -80,12 +85,14 @@ export function OutfitCard() {
           ))}
         </Text>
       </View>
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', paddingTop: 8, paddingHorizontal: 4 },
+  center: { alignItems: 'center', width: '100%' },
   cat: { fontSize: 10, letterSpacing: 2, textAlign: 'center' },
   name: { fontSize: 30, marginTop: 7, marginBottom: 14, textAlign: 'center', letterSpacing: -0.3 },
   sils: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 16, minHeight: 210, width: '100%' },
