@@ -6,6 +6,7 @@ import { CLOTH, OCC, STYLES, skinObj, uniStats, type Occasion, type StyleName, t
 import { Button } from '@/components/Button';
 import { ChipRow } from '@/components/ChipRow';
 import { Icon } from '@/components/Icon';
+import { Logo } from '@/components/Logo';
 import { OutfitCard } from '@/components/OutfitCard';
 import { ProgressBar } from '@/components/ProgressBar';
 import { Segmented, type Pane } from '@/components/Segmented';
@@ -95,7 +96,7 @@ export default function Main() {
           <Icon name="menu" size={18} color={t.ink} />
         </Pressable>
         <View style={styles.brand}>
-          <View style={styles.mk} />
+          <Logo size={24} />
           <Text style={[styles.brandTxt, { color: t.ink, fontFamily: fonts.uiBold }]}>ColorCloset</Text>
         </View>
         <Pressable
@@ -214,7 +215,6 @@ const styles = StyleSheet.create({
   topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 16, paddingBottom: 10 },
   hamb: { width: 40, height: 40, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  mk: { width: 24, height: 24, borderRadius: 7, backgroundColor: '#C9A86A' },
   brandTxt: { fontSize: 15 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingLeft: 7, paddingRight: 11, borderRadius: 99, borderWidth: 1 },
   pillDot: { width: 14, height: 14, borderRadius: 7 },

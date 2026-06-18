@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
-import { type ReactNode } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInLeft, SlideOutLeft } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { uniStats, skinObj } from '@/engine';
 import { Icon, type IconName } from '@/components/Icon';
+import { Logo } from '@/components/Logo';
 import { useStore } from '@/store/useStore';
 import { useUiStore } from '@/store/uiStore';
 import { fonts } from '@/theme/fonts';
@@ -62,7 +62,7 @@ export function SideMenu() {
         style={[styles.sheet, { backgroundColor: t.surface, borderRightColor: t.line, paddingTop: insets.top + 22, paddingBottom: insets.bottom + 4 }]}
       >
         <View style={styles.brand}>
-          <Brand />
+          <Logo size={30} />
           <Text style={[styles.brandTxt, { color: t.ink, fontFamily: fonts.uiBold }]}>ColorCloset</Text>
         </View>
 
@@ -92,10 +92,6 @@ export function SideMenu() {
       </Animated.View>
     </View>
   );
-}
-
-function Brand() {
-  return <View style={styles.mk} />;
 }
 
 function Item({
@@ -135,7 +131,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, paddingBottom: 22 },
-  mk: { width: 30, height: 30, borderRadius: 9, backgroundColor: '#C9A86A' },
   brandTxt: { fontSize: 17 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 12, borderRadius: 14 },
   itemTxt: { fontSize: 14.5 },
