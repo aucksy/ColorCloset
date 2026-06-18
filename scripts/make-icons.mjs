@@ -1,8 +1,10 @@
 /**
  * Generates ColorCloset's logo assets from SVG (run: `node scripts/make-icons.mjs`).
- * Mark: a 12-segment colour wheel (the product is colour) framed by a thin
- * champagne-gold ring, on the app's dark tile. Outputs the launcher icon,
- * Android adaptive foreground/background/monochrome, splash mark, and favicon.
+ * Mark: the "Armoire" — a champagne-bordered wardrobe cabinet with the full colour
+ * spectrum glowing down the door seam (colour lives inside the closet), gold handles
+ * and feet, on the app's deep-black tile. Ported from the Claude Design exploration
+ * (concept 06 · Armoire). Outputs the launcher icon, Android adaptive
+ * foreground/background/monochrome, splash mark, and favicon.
  */
 import { Resvg } from '@resvg/resvg-js';
 import fs from 'node:fs';
@@ -11,68 +13,105 @@ import { fileURLToPath } from 'node:url';
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'assets', 'images');
 
-const DARK = '#0D0D11';
-const GOLD = '#C9A86A';
-const WHEEL = [
-  '#D8584F', '#DD7E3C', '#D8A23C', '#B9B24A', '#5FA85C', '#3FA77E',
-  '#3DA0A6', '#3A78B0', '#4F5DB0', '#7E5BC0', '#B452A8', '#CC5274',
-];
+const GOLD_BORDER = '#E6C074';
+// Vertical door-seam spectrum (top -> bottom), from the design.
+const SEAM = ['#ef5350', '#ff8a3d', '#ffd34d', '#b6e05a', '#4cd2a0', '#38b6e0', '#5a7bf0', '#9b6bf0', '#d667c8'];
 
-const S = 1024; // authoring canvas
-const C = S / 2;
-const rad = (d) => (d * Math.PI) / 180;
-const pt = (r, a) => [C + r * Math.cos(a), C + r * Math.sin(a)];
-const n = (x) => x.toFixed(2);
+const VB = 240; // authoring canvas (matches the design's 240px tile)
+const CX = VB / 2;
+const CY = VB / 2;
+const n = (x) => Number(x).toFixed(2);
 
-/** 12 annular sectors (a segmented colour-wheel ring) with a small gap between them. */
-function sectors(R, r, gap = 3) {
-  let out = '';
-  for (let i = 0; i < 12; i++) {
-    const a0 = rad(i * 30 + gap / 2 - 90);
-    const a1 = rad((i + 1) * 30 - gap / 2 - 90);
-    const [x0o, y0o] = pt(R, a0);
-    const [x1o, y1o] = pt(R, a1);
-    const [x1i, y1i] = pt(r, a1);
-    const [x0i, y0i] = pt(r, a0);
-    const d = `M ${n(x0o)} ${n(y0o)} A ${n(R)} ${n(R)} 0 0 1 ${n(x1o)} ${n(y1o)} L ${n(x1i)} ${n(y1i)} A ${n(r)} ${n(r)} 0 0 0 ${n(x0i)} ${n(y0i)} Z`;
-    out += `<path d="${d}" fill="${WHEEL[i]}"/>`;
-  }
-  return out;
+const seamStops = SEAM.map((c, i) => `<stop offset="${n(i / (SEAM.length - 1))}" stop-color="${c}"/>`).join('');
+
+const defs = (k) => `<defs>
+  <radialGradient id="bg" cx="50%" cy="28%" r="82%">
+    <stop offset="0" stop-color="#211d18"/>
+    <stop offset="0.58" stop-color="#0d0c0d"/>
+    <stop offset="1" stop-color="#060607"/>
+  </radialGradient>
+  <linearGradient id="sheen" x1="0" y1="0" x2="${VB}" y2="${VB * 0.75}" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#ffffff" stop-opacity="0.12"/>
+    <stop offset="0.38" stop-color="#ffffff" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="cab" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#221e19"/>
+    <stop offset="1" stop-color="#15110d"/>
+  </linearGradient>
+  <linearGradient id="seam" x1="0" y1="0" x2="0" y2="1">${seamStops}</linearGradient>
+  <linearGradient id="handle" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#f3dca0"/><stop offset="1" stop-color="#cda053"/>
+  </linearGradient>
+  <linearGradient id="foot" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#e6c074"/><stop offset="1" stop-color="#b9893f"/>
+  </linearGradient>
+  <filter id="blur" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur stdDeviation="${n(4.5 * k)}"/>
+  </filter>
+</defs>`;
+
+/** The armoire cabinet group, scaled by k about the tile centre (transparent bg). */
+function armoire(k) {
+  const w = 120 * k, h = 158 * k;
+  const x = CX - w / 2, y = CY - h / 2;
+  const rr = 16 * k;
+  const glowW = 16 * k, crispW = 5 * k;
+  const handleW = 5 * k, handleH = 34 * k, handleTop = y + 62 * k;
+  const footW = 14 * k, footH = 14 * k, footTop = y + h - 5 * k;
+  const r = (px, py, pw, ph, prx, fill, extra = '') =>
+    `<rect x="${n(px)}" y="${n(py)}" width="${n(pw)}" height="${n(ph)}" rx="${n(prx)}" ${fill} ${extra}/>`;
+  return [
+    // cabinet body + inset gold border
+    r(x, y, w, h, rr, 'fill="url(#cab)"'),
+    r(x + 1.2 * k, y + 1.2 * k, w - 2.4 * k, h - 2.4 * k, rr - 1.2 * k, 'fill="none"',
+      `stroke="${GOLD_BORDER}" stroke-width="${n(2 * k)}" stroke-opacity="0.5"`),
+    // glowing spectrum seam (soft halo + crisp core)
+    r(CX - glowW / 2, y + 14 * k, glowW, h - 28 * k, glowW / 2, 'fill="url(#seam)"', 'opacity="0.8" filter="url(#blur)"'),
+    r(CX - crispW / 2, y + 16 * k, crispW, h - 32 * k, crispW / 2, 'fill="url(#seam)"'),
+    // two gold door handles flanking the seam
+    r(CX - 16 * k - handleW / 2, handleTop, handleW, handleH, handleW / 2, 'fill="url(#handle)"'),
+    r(CX + 16 * k - handleW / 2, handleTop, handleW, handleH, handleW / 2, 'fill="url(#handle)"'),
+    // two gold feet
+    r(x + 14 * k, footTop, footW, footH, 3 * k, 'fill="url(#foot)"'),
+    r(x + w - 28 * k, footTop, footW, footH, 3 * k, 'fill="url(#foot)"'),
+  ].join('');
 }
 
-/** The wheel plus its gold framing ring. */
-function wheel(R, r, goldWidth = 9) {
-  const goldR = R + R * 0.06;
-  return (
-    sectors(R, r) +
-    `<circle cx="${C}" cy="${C}" r="${n(goldR)}" fill="none" stroke="${GOLD}" stroke-width="${goldWidth}" stroke-opacity="0.9"/>` +
-    `<circle cx="${C}" cy="${C}" r="${n(r - r * 0.06)}" fill="none" stroke="${GOLD}" stroke-width="${goldWidth * 0.6}" stroke-opacity="0.5"/>`
-  );
-}
+const svg = (inner, k = 1) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${VB}" height="${VB}" viewBox="0 0 ${VB} ${VB}">${defs(k)}${inner}</svg>`;
 
-const glow = `<defs><radialGradient id="g" cx="26%" cy="12%" r="70%">
-  <stop offset="0" stop-color="${GOLD}" stop-opacity="0.20"/>
-  <stop offset="0.6" stop-color="${GOLD}" stop-opacity="0"/>
-</radialGradient></defs>`;
+const tile = `<rect width="${VB}" height="${VB}" fill="url(#bg)"/>`;
+const sheen = `<rect width="${VB}" height="${VB}" fill="url(#sheen)"/>`;
 
-const svg = (inner) => `<svg xmlns="http://www.w3.org/2000/svg" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}">${inner}</svg>`;
+// Full-bleed launcher icon (the OS masks the corners): tile + armoire + sheen.
+const iconSvg = svg(`${tile}${armoire(1)}${sheen}`, 1);
 
-// Full-bleed launcher icon (iOS masks the corners): dark tile + glow + framed wheel.
-const iconSvg = svg(`${glow}<rect width="${S}" height="${S}" fill="${DARK}"/><rect width="${S}" height="${S}" fill="url(#g)"/>${wheel(320, 188, 11)}`);
+// Android adaptive foreground: armoire only, transparent, inside the ~66% safe zone.
+const foregroundSvg = svg(armoire(0.82), 0.82);
 
-// Android adaptive foreground: wheel only, transparent, inside the ~66% safe zone.
-const foregroundSvg = svg(wheel(268, 158, 9));
+// Android adaptive background: the dark tile + sheen.
+const backgroundSvg = svg(`${tile}${sheen}`, 1);
 
-// Android adaptive background: dark tile + subtle glow.
-const backgroundSvg = svg(`${glow}<rect width="${S}" height="${S}" fill="${DARK}"/><rect width="${S}" height="${S}" fill="url(#g)"/>`);
+// Splash mark: armoire, transparent (shown on the dark splash background).
+const splashSvg = svg(armoire(1), 1);
 
-// Monochrome (themed icons): a single white ring silhouette, transparent.
-const monoSvg = svg(
-  `<path fill="#ffffff" fill-rule="evenodd" d="M ${C} ${C} m -300 0 a 300 300 0 1 0 600 0 a 300 300 0 1 0 -600 0 M ${C} ${C} m -176 0 a 176 176 0 1 0 352 0 a 176 176 0 1 0 -352 0"/>`
-);
-
-// Splash mark: framed wheel, transparent (shown on the dark splash background).
-const splashSvg = svg(wheel(360, 212, 12));
+// Monochrome (themed icons): white wardrobe silhouette with the seam knocked out.
+const monoSvg = (() => {
+  const k = 0.82;
+  const w = 120 * k, h = 158 * k;
+  const x = CX - w / 2, y = CY - h / 2;
+  const rr = 16 * k;
+  const seamW = 7 * k, footW = 14 * k, footH = 14 * k, footTop = y + h - 5 * k;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${VB}" height="${VB}" viewBox="0 0 ${VB} ${VB}">
+    <mask id="seamMask">
+      <rect width="${VB}" height="${VB}" fill="#fff"/>
+      <rect x="${n(CX - seamW / 2)}" y="${n(y + 16 * k)}" width="${n(seamW)}" height="${n(h - 32 * k)}" rx="${n(seamW / 2)}" fill="#000"/>
+    </mask>
+    <rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" rx="${n(rr)}" fill="#ffffff" mask="url(#seamMask)"/>
+    <rect x="${n(x + 14 * k)}" y="${n(footTop)}" width="${n(footW)}" height="${n(footH)}" rx="${n(3 * k)}" fill="#ffffff"/>
+    <rect x="${n(x + w - 28 * k)}" y="${n(footTop)}" width="${n(footW)}" height="${n(footH)}" rx="${n(3 * k)}" fill="#ffffff"/>
+  </svg>`;
+})();
 
 function render(svgStr, file, width) {
   const r = new Resvg(svgStr, { fitTo: { mode: 'width', value: width }, background: 'rgba(0,0,0,0)' });
