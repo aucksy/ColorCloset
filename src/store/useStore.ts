@@ -281,8 +281,10 @@ export const useStore = create<Store>()(
         style: s.style,
         setupComplete: s.setupComplete,
       }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
+      // Always flip the flag once persistence settles — even if reading storage
+      // failed — so the app never hangs on the splash screen.
+      onRehydrateStorage: () => () => {
+        useStore.setState({ _hasHydrated: true });
       },
     }
   )

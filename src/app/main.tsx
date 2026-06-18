@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,14 +46,16 @@ export default function Main() {
   const another = useStore((s) => s.another);
   const markWorn = useStore((s) => s.markWorn);
   const saveCurrent = useStore((s) => s.saveCurrent);
+  const saved = useStore((s) => s.saved);
 
   const openDrawer = useUiStore((s) => s.openDrawer);
   const openPanel = useUiStore((s) => s.openPanel);
   const showToast = useUiStore((s) => s.showToast);
   const panel = useUiStore((s) => s.panel);
 
-  // Ensure an outfit is showing on first entry.
-  useEffect(() => {
+  // Ensure an outfit is showing on first entry (before paint, to avoid a flash of
+  // the empty state for returning users whose session `current` starts null).
+  useLayoutEffect(() => {
     if (!current) regenerate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -61,6 +63,7 @@ export default function Main() {
   const skin = skinObj(depth, undertone);
   const { total, worn: wornCount } = uniStats(tops, bottoms, skin, worn);
   const hasTags = Object.keys(types).some((k) => (types[k]?.length ?? 0) > 0);
+  const isSaved = !!current && saved.some((x) => x.t === current.t && x.b === current.b);
 
   const onAnother = () => {
     const roundDone = another();
@@ -71,6 +74,10 @@ export default function Main() {
     showToast("Marked worn — here's a fresh one");
   };
   const onSave = () => {
+    if (isSaved) {
+      showToast('Already in your looks');
+      return;
+    }
     saveCurrent();
     showToast('Saved to your looks');
   };
@@ -145,20 +152,43 @@ export default function Main() {
               </Pressable>
             </View>
 
-            <OutfitCard />
-
-            <View style={styles.actions}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Save look"
-                onPress={onSave}
-                style={[styles.iconAct, { borderColor: t.line2 }]}
-              >
-                <Icon name="bookmark" size={20} color={t.ink} />
-              </Pressable>
-              <Button title="Mark it worn" onPress={onWore} style={{ flex: 1 }} icon={<Icon name="check" size={18} color={t.onGold} strokeWidth={3} />} />
-              <Button title="Another" variant="ghost" onPress={onAnother} style={{ flex: 1 }} icon={<Icon name="refresh" size={18} color={t.ink} />} />
-            </View>
+            {current ? (
+              <>
+                <OutfitCard />
+                <View style={styles.actions}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={isSaved ? 'Saved' : 'Save look'}
+                    accessibilityState={{ selected: isSaved }}
+                    onPress={onSave}
+                    style={[styles.iconAct, { borderColor: isSaved ? t.accent : t.line2 }]}
+                  >
+                    <Icon name="bookmark" size={20} color={isSaved ? t.accent : t.ink} />
+                  </Pressable>
+                  <Button title="Mark it worn" onPress={onWore} style={{ flex: 1 }} icon={<Icon name="check" size={18} color={t.onGold} strokeWidth={3} />} />
+                  <Button title="Another" variant="ghost" onPress={onAnother} style={{ flex: 1 }} icon={<Icon name="refresh" size={18} color={t.ink} />} />
+                </View>
+              </>
+            ) : (
+              <View style={styles.emptyRec}>
+                <View style={[styles.emptyIc, { backgroundColor: t.glass, borderColor: t.line }]}>
+                  <Icon name={total === 0 ? 'grid' : 'tags'} size={24} color={t.accent} />
+                </View>
+                <Text style={[styles.emptyH, { color: t.ink, fontFamily: fonts.display }]}>
+                  {total === 0 ? 'No combinations yet' : 'Nothing matches this filter'}
+                </Text>
+                <Text style={[styles.emptyP, { color: t.muted, fontFamily: fonts.uiRegular }]}>
+                  {total === 0
+                    ? 'Add a few colours to your tops and bottoms from the menu → Set up again.'
+                    : `No looks use only ${typeFilter} colours. Switch “For” back to All to see everything.`}
+                </Text>
+                {total > 0 && (
+                  <View style={styles.emptyBtn}>
+                    <Button title="Show all" variant="goldline" onPress={() => setTypeFilter('all')} />
+                  </View>
+                )}
+              </View>
+            )}
           </Animated.View>
         ) : (
           <Animated.View key="shop" entering={FadeIn.duration(motion.fast)}>
@@ -195,4 +225,9 @@ const styles = StyleSheet.create({
   progTxt: { fontSize: 11 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 18, alignItems: 'stretch' },
   iconAct: { width: 56, borderWidth: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  emptyRec: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 20 },
+  emptyIc: { width: 56, height: 56, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  emptyH: { fontSize: 19, marginBottom: 7, textAlign: 'center' },
+  emptyP: { fontSize: 13, lineHeight: 20, textAlign: 'center', maxWidth: 250 },
+  emptyBtn: { alignSelf: 'stretch', paddingHorizontal: 50, marginTop: 18 },
 });

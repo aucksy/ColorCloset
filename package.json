@@ -11,6 +11,7 @@
     "@testing-library/react-native": "^14.0.0",
     "@types/jest": "29.5.14",
     "expo": "~56.0.12",
+    "expo-build-properties": "~56.0.19",
     "expo-constants": "~56.0.18",
     "expo-device": "~56.0.4",
     "expo-font": "~56.0.7",
