@@ -10,18 +10,11 @@ export type ColorKey = string;
 /** Skin depth ladder, lightest -> deepest. Drives the (depth-only) flatter sets. */
 export type DepthId = 'fair' | 'light' | 'medium' | 'tan' | 'deep' | 'rich';
 
-/** Visual-risk axis, independent of occasion. */
+/** Visual-risk axis — the single selection on the Style-me screen. */
 export type StyleName = 'Minimal' | 'Classic' | 'Bold' | 'Statement';
 
-/** How dressed-up the look should read (the "Dress code" axis). Kept to three
- *  simple buckets; the engine maps each to a different ranking bias. */
-export type Occasion = 'Casual' | 'Formal' | 'Relaxed';
-
-/** Optional clothing-context tags. */
-export type ClothType = 'casual' | 'formal' | 'gym' | 'ethnic';
-
-/** "All" plus the three cloth types, used by the Style-me "For" filter. */
-export type TypeFilter = 'all' | ClothType;
+/** Belt + shoe leather colour for a look (office attire). */
+export type Leather = 'Black' | 'Brown';
 
 /** Shade index into a colour's 5-step light->dark strip. 2 = base/default. */
 export type ShadeIndex = 0 | 1 | 2 | 3 | 4;

@@ -1,11 +1,11 @@
 /**
- * The scoring core: harmony (person/occasion-independent), style bias, and the
- * combined score = harmony + flatter bonuses + occasion modifier + style bias.
- * All weights are the exact prototype values (lines ~661-715, §9.3 / 9.5 / 9.6).
+ * The scoring core: harmony (person-independent), style bias, and the combined
+ * score = harmony + flatter bonuses + gentle office lean + style bias.
+ * Weights are the prototype's tuning, adapted for the office-attire positioning.
  */
 import { BOLD, COOL, CORP, NEUTRAL, WARM, lum } from './colors';
 import { GOOD, GOODSET } from './constants';
-import type { ColorKey, Occasion, SkinObj, StyleName } from './types';
+import type { ColorKey, SkinObj, StyleName } from './types';
 
 /** How well two colours go together, independent of person/occasion. Clamped 0..1. */
 export function harmony(t: ColorKey, b: ColorKey): number {
@@ -61,35 +61,26 @@ export function styleBias(t: ColorKey, b: ColorKey, style: StyleName | null | un
   return d;
 }
 
-/** Combined context-aware score for a (top, bottom) pairing. */
+/**
+ * Combined score for a (top, bottom) pairing. The app is positioned for office
+ * attire, so the base carries a gentle corporate lean and a grounded-neutral-bottom
+ * nudge; the Style axis then shapes the ranking. (No occasion axis.)
+ */
 export function score(
   t: ColorKey,
   b: ColorKey,
   skin: SkinObj | null,
-  occ: Occasion,
   style?: StyleName | null
 ): number {
   let s = harmony(t, b);
   const fl = skin ? skin.flatter : [];
   if (fl.includes(t)) s += 0.08;
   if (fl.includes(b)) s += 0.06;
-  // Dress-code bias: each of the three buckets nudges ranking a different way.
-  const dl = Math.abs(lum(t) - lum(b));
-  if (occ === 'Formal') {
-    // dressed-up: favour clean/corporate colours, ease off loud ones
-    if (CORP.has(t)) s += 0.07;
-    if (CORP.has(b)) s += 0.07;
-    if (BOLD.has(t)) s -= 0.07;
-    if (BOLD.has(b)) s -= 0.05;
-  } else if (occ === 'Casual') {
-    // everyday: a grounded neutral bottom + a little crisp contrast read well
-    if (NEUTRAL.has(b)) s += 0.05;
-    if (dl > 0.3) s += 0.04;
-  } else if (occ === 'Relaxed') {
-    // off-duty ease: soft, tonal, low-contrast pairings feel relaxed
-    if (NEUTRAL.has(b)) s += 0.04;
-    if (dl < 0.22) s += 0.06;
-  }
+  // Gentle office lean: clean/corporate colours read a touch better by default,
+  // and a grounded neutral trouser is the office staple.
+  if (CORP.has(t)) s += 0.03;
+  if (CORP.has(b)) s += 0.04;
+  if (NEUTRAL.has(b)) s += 0.03;
   s += styleBias(t, b, style);
   return s;
 }

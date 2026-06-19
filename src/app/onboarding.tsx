@@ -1,17 +1,14 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CLOTH, DEPTHS, comboUniverse, skinNote, skinObj, type ClothType } from '@/engine';
+import { comboUniverse, skinNote, skinObj } from '@/engine';
 import { BuildingOverlay } from '@/components/BuildingOverlay';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { SkinGrid } from '@/components/SkinGrid';
 import { SwatchGrid } from '@/components/SwatchGrid';
-import { extractColors } from '@/lib/extractColors';
-import { extractSkinDepth } from '@/lib/extractSkinDepth';
-import { pickImage, type PickSource } from '@/lib/pickImage';
 import { useStore } from '@/store/useStore';
 import { fonts } from '@/theme/fonts';
 import { useTheme } from '@/theme/useTheme';
@@ -20,106 +17,70 @@ export default function Onboarding() {
   const t = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [step, setStep] = useState(0);
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const addMode = mode === 'add'; // launched from "Add more colours" — skip the skin step
+
+  const firstStep = addMode ? 1 : 0;
+  const [step, setStep] = useState(firstStep);
   const [building, setBuilding] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [hint, setHint] = useState('');
-  const [topsTags, setTopsTags] = useState<ClothType[]>([]);
-  const [bottomsTags, setBottomsTags] = useState<ClothType[]>([]);
 
   const depth = useStore((s) => s.depth);
   const tops = useStore((s) => s.tops);
   const bottoms = useStore((s) => s.bottoms);
   const setDepth = useStore((s) => s.setDepth);
-  const setColors = useStore((s) => s.setColors);
-  const addTypeToColors = useStore((s) => s.addTypeToColors);
   const completeSetup = useStore((s) => s.completeSetup);
   const regenerate = useStore((s) => s.regenerate);
 
-  const total = useMemo(
-    () => comboUniverse(tops, bottoms, skinObj(depth)).length,
-    [tops, bottoms, depth]
-  );
+  // Universe size before any edits this session — drives the "+N new" delta in add mode.
+  const [beforeTotal] = useState(() => comboUniverse(tops, bottoms, skinObj(depth)).length);
+  const total = useMemo(() => comboUniverse(tops, bottoms, skinObj(depth)).length, [tops, bottoms, depth]);
 
-  // Android back: step backwards through onboarding (and block during building).
+  // Android back: step back through the flow; in add mode the first step exits to main.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (building) return true;
-      if (step > 0) {
-        setHint('');
-        setStep(step - 1);
-        return true;
-      }
+      if (step > firstStep) { setStep(step - 1); return true; }
+      if (addMode) { router.back(); return true; }
       return false;
     });
     return () => sub.remove();
-  }, [step, building]);
+  }, [step, building, addMode, firstStep, router]);
 
-  const scanSkin = async (source: PickSource) => {
-    setBusy(true);
-    setHint('');
-    const uri = await pickImage(source, { front: source === 'camera' });
-    if (uri) {
-      const d = await extractSkinDepth(uri);
-      if (d) {
-        setDepth(d);
-        setHint(`Detected ${(DEPTHS.find((x) => x.id === d) || DEPTHS[2]).name} — adjust below if needed.`);
-      } else {
-        setHint("Couldn't read that — pick a shade below.");
-      }
-    }
-    setBusy(false);
+  const back = () => {
+    if (step > firstStep) setStep(step - 1);
+    else if (addMode) router.back();
   };
-
-  const scanWardrobe = async (slot: 'tops' | 'bottoms', source: PickSource) => {
-    setBusy(true);
-    setHint('');
-    const uri = await pickImage(source);
-    if (uri) {
-      const colors = await extractColors(uri);
-      if (colors.length) {
-        setColors(slot, colors);
-        setHint(`Read ${colors.length} colour${colors.length > 1 ? 's' : ''} — fix any below.`);
-      } else {
-        setHint("Couldn't read colours — tap them below.");
-      }
-    }
-    setBusy(false);
-  };
-
-  const goToBottoms = () => {
-    topsTags.forEach((tag) => addTypeToColors(tops, tag));
-    setHint('');
-    setStep(2);
-  };
-  const finish = () => {
-    bottomsTags.forEach((tag) => addTypeToColors(bottoms, tag));
-    setBuilding(true);
-  };
+  const finish = () => setBuilding(true);
   const onBuilt = () => {
-    completeSetup();
+    if (!addMode) completeSetup();
     regenerate();
-    router.replace('/main');
+    if (addMode) router.back();
+    else router.replace('/main');
   };
 
-  const eyebrow = `Step ${step + 1} of 3`;
+  const totalSteps = addMode ? 2 : 3;
+  const dotIndex = addMode ? step - 1 : step; // 0-based within the visible flow
+  const eyebrow = `Step ${dotIndex + 1} of ${totalSteps}`;
+  const canBack = step > firstStep || addMode;
 
   return (
     <View style={[styles.root, { backgroundColor: t.bg, paddingTop: insets.top }]}>
       <View style={styles.top}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => step > 0 && (setHint(''), setStep(step - 1))}
-          style={[styles.back, { opacity: step === 0 ? 0 : 1 }]}
-          disabled={step === 0}
+          accessibilityLabel={addMode && step === firstStep ? 'Close' : 'Back'}
+          onPress={back}
+          style={[styles.back, { opacity: canBack ? 1 : 0 }]}
+          disabled={!canBack}
         >
           <Icon name="chevron-left" size={15} color={t.muted} />
-          <Text style={[styles.backTxt, { color: t.muted, fontFamily: fonts.ui }]}>Back</Text>
+          <Text style={[styles.backTxt, { color: t.muted, fontFamily: fonts.ui }]}>
+            {addMode && step === firstStep ? 'Close' : 'Back'}
+          </Text>
         </Pressable>
         <View style={styles.dots}>
-          {[0, 1, 2].map((nm) => (
-            <View key={nm} style={[styles.dot, { backgroundColor: nm <= step ? t.accent : t.track, width: nm === step ? 22 : 7 }]} />
+          {Array.from({ length: totalSteps }).map((_, nm) => (
+            <View key={nm} style={[styles.dot, { backgroundColor: nm <= dotIndex ? t.accent : t.track, width: nm === dotIndex ? 22 : 7 }]} />
           ))}
         </View>
         <View style={{ width: 60 }} />
@@ -131,14 +92,12 @@ export default function Onboarding() {
 
           {step === 0 && (
             <>
-              <Title t={t}>
-                First, your <Em t={t}>skin tone.</Em>
-              </Title>
-              <Lead t={t}>Scan your face or pick a shade — we read depth only, to gently nudge what flatters you. It never rules a colour out.</Lead>
-              <ScanButtons t={t} busy={busy} onCamera={() => scanSkin('camera')} onGallery={() => scanSkin('gallery')} />
-              {!!hint && <Text style={[styles.hint, { color: t.muted, fontFamily: fonts.uiRegular }]}>{hint}</Text>}
-              <Text style={[styles.label, { color: t.faint, fontFamily: fonts.mono }]}>OR PICK A DEPTH</Text>
-              <SkinGrid value={depth} onSelect={(d) => { setHint(''); setDepth(d); }} />
+              <Text style={[styles.title, { color: t.ink, fontFamily: fonts.display }]}>
+                First, your <Text style={{ color: t.accent, fontFamily: fonts.displayItalic }}>skin tone.</Text>
+              </Text>
+              <Lead t={t}>Pick the depth closest to yours — we use it gently to nudge what flatters you. It never rules a colour out.</Lead>
+              <Text style={[styles.label, { color: t.faint, fontFamily: fonts.mono }]}>PICK A DEPTH</Text>
+              <SkinGrid value={depth} onSelect={setDepth} />
               {depth && (
                 <Text style={[styles.note, { color: t.muted, borderLeftColor: t.accent, fontFamily: fonts.uiRegular }]}>
                   {skinNote(depth)}
@@ -151,13 +110,8 @@ export default function Onboarding() {
             <WardrobeStep
               t={t}
               slot="tops"
-              title="Your tops."
-              lead="Snap or upload a photo and we'll read the colours — or tap them below."
-              busy={busy}
-              hint={hint}
-              onScan={(src) => scanWardrobe('tops', src)}
-              tags={topsTags}
-              onToggleTag={(tag) => setTopsTags((p) => (p.includes(tag) ? p.filter((x) => x !== tag) : [...p, tag]))}
+              title={addMode ? 'Add tops.' : 'Your tops.'}
+              lead="Tap every colour you own — pick more than one shade per colour if you like."
             />
           )}
 
@@ -165,95 +119,38 @@ export default function Onboarding() {
             <WardrobeStep
               t={t}
               slot="bottoms"
-              title="Now your bottoms."
-              lead="Same idea — a photo of your trousers, jeans and chinos, or tap the colours."
-              busy={busy}
-              hint={hint}
-              onScan={(src) => scanWardrobe('bottoms', src)}
-              tags={bottomsTags}
-              onToggleTag={(tag) => setBottomsTags((p) => (p.includes(tag) ? p.filter((x) => x !== tag) : [...p, tag]))}
+              title={addMode ? 'Add bottoms.' : 'Now your bottoms.'}
+              lead="Your trousers, jeans and chinos — tap the colours you own."
             />
           )}
         </Animated.View>
       </ScrollView>
 
       <View style={[styles.foot, { paddingBottom: insets.bottom + 18 }]}>
-        {step === 0 && <Button title="Continue" onPress={() => { setHint(''); setStep(1); }} disabled={!depth} icon={<Icon name="chevron-right" size={18} color={t.onGold} />} />}
-        {step === 1 && <Button title="Continue" onPress={goToBottoms} disabled={tops.length === 0} icon={<Icon name="chevron-right" size={18} color={t.onGold} />} />}
-        {step === 2 && <Button title="See my combinations" onPress={finish} disabled={bottoms.length === 0} icon={<Icon name="chevron-right" size={18} color={t.onGold} />} />}
+        {step === 0 && <Button title="Continue" onPress={() => setStep(1)} disabled={!depth} icon={<Icon name="chevron-right" size={18} color={t.onGold} />} />}
+        {step === 1 && <Button title="Continue" onPress={() => setStep(2)} disabled={tops.length === 0} icon={<Icon name="chevron-right" size={18} color={t.onGold} />} />}
+        {step === 2 && <Button title={addMode ? 'Update my combinations' : 'See my combinations'} onPress={finish} disabled={bottoms.length === 0} icon={<Icon name="chevron-right" size={18} color={t.onGold} />} />}
       </View>
 
-      {building && <BuildingOverlay total={total} onDone={onBuilt} />}
+      {building && <BuildingOverlay total={total} addedFrom={addMode ? beforeTotal : undefined} onDone={onBuilt} />}
     </View>
   );
 }
 
 type ThemeT = ReturnType<typeof useTheme>;
 
-function ScanButtons({ t, busy, onCamera, onGallery }: { t: ThemeT; busy: boolean; onCamera: () => void; onGallery: () => void }) {
-  return (
-    <View style={{ marginTop: 22, gap: 10 }}>
-      {busy ? (
-        <View style={[styles.busy, { borderColor: t.line, backgroundColor: t.glass }]}>
-          <ActivityIndicator color={t.accent} />
-          <Text style={[styles.busyTxt, { color: t.muted, fontFamily: fonts.uiRegular }]}>Reading colours…</Text>
-        </View>
-      ) : (
-        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'stretch' }}>
-          <View style={{ flex: 1 }}>
-            <Button title="Camera" variant="goldline" onPress={onCamera} icon={<Icon name="camera" size={18} color={t.goldSoft} />} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button title="Gallery" variant="ghost" onPress={onGallery} icon={<Icon name="image" size={18} color={t.ink} />} />
-          </View>
-        </View>
-      )}
-    </View>
-  );
-}
-
-function WardrobeStep({
-  t, slot, title, lead, busy, hint, onScan, tags, onToggleTag,
-}: {
-  t: ThemeT; slot: 'tops' | 'bottoms'; title: string; lead: string; busy: boolean; hint: string;
-  onScan: (src: PickSource) => void; tags: ClothType[]; onToggleTag: (tag: ClothType) => void;
-}) {
+function WardrobeStep({ t, slot, title, lead }: { t: ThemeT; slot: 'tops' | 'bottoms'; title: string; lead: string }) {
   return (
     <>
       <Text style={[styles.title, { color: t.ink, fontFamily: fonts.display }]}>{title}</Text>
       <Lead t={t}>{lead}</Lead>
-      <ScanButtons t={t} busy={busy} onCamera={() => onScan('camera')} onGallery={() => onScan('gallery')} />
-      {!!hint && <Text style={[styles.hint, { color: t.muted, fontFamily: fonts.uiRegular }]}>{hint}</Text>}
       <View style={{ marginTop: 18 }}>
         <SwatchGrid slot={slot} />
-      </View>
-      <Text style={[styles.label, { color: t.faint, fontFamily: fonts.mono }]}>THESE ARE — OPTIONAL</Text>
-      <View style={styles.tagRow}>
-        {CLOTH.map((ct) => {
-          const on = tags.includes(ct.id as ClothType);
-          return (
-            <Pressable
-              key={ct.id}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on }}
-              onPress={() => onToggleTag(ct.id as ClothType)}
-              style={[styles.tag, { backgroundColor: on ? t.accent : t.glass, borderColor: on ? 'transparent' : t.line }]}
-            >
-              <Text style={[styles.tagTxt, { color: on ? t.onGold : t.muted, fontFamily: fonts.uiSemi }]}>{ct.name}</Text>
-            </Pressable>
-          );
-        })}
       </View>
     </>
   );
 }
 
-function Title({ children, t }: { children: React.ReactNode; t: ThemeT }) {
-  return <Text style={[styles.title, { color: t.ink, fontFamily: fonts.display }]}>{children}</Text>;
-}
-function Em({ children, t }: { children: React.ReactNode; t: ThemeT }) {
-  return <Text style={{ color: t.accent, fontFamily: fonts.displayItalic }}>{children}</Text>;
-}
 function Lead({ children, t }: { children: React.ReactNode; t: ThemeT }) {
   return <Text style={[styles.lead, { color: t.muted, fontFamily: fonts.uiRegular }]}>{children}</Text>;
 }
@@ -271,11 +168,5 @@ const styles = StyleSheet.create({
   lead: { fontSize: 14, lineHeight: 21, maxWidth: 340 },
   label: { fontSize: 10, letterSpacing: 1.6, marginTop: 22, marginBottom: 9 },
   note: { fontSize: 12.5, lineHeight: 19, marginTop: 18, borderLeftWidth: 2, paddingLeft: 12 },
-  hint: { fontSize: 12.5, lineHeight: 18, marginTop: 12 },
-  busy: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 16, borderRadius: 18, borderWidth: 1 },
-  busyTxt: { fontSize: 13 },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1 },
-  tagTxt: { fontSize: 12.5 },
   foot: { paddingHorizontal: 22, paddingTop: 12 },
 });

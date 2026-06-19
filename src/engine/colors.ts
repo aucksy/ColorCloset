@@ -15,8 +15,10 @@ const BASE_HEX: Record<ColorKey, string> = {
   Black: '#1B1B1F',
   Olive: '#6C7138',
   Burgundy: '#72202F',
+  Maroon: '#7B1F2B',
   Beige: '#DAC8A9',
   Khaki: '#BEB079',
+  Brown: '#5C4033',
   Charcoal: '#34373D',
   Cream: '#EFE7D2',
   Mustard: '#C9A227',
@@ -114,17 +116,17 @@ export function nearest(r: number, g: number, b: number): ColorKey {
 /* ---------- Colour sets (the backbone of harmony / occasion / style logic) ---------- */
 
 export const NEUTRAL = new Set<ColorKey>([
-  'White', 'Grey', 'Black', 'Beige', 'Cream', 'Charcoal', 'Khaki', 'Navy',
+  'White', 'Grey', 'Black', 'Beige', 'Cream', 'Charcoal', 'Khaki', 'Navy', 'Brown',
 ]);
-export const WARM = new Set<ColorKey>(['Beige', 'Cream', 'Khaki', 'Olive', 'Mustard', 'Rust']);
+export const WARM = new Set<ColorKey>(['Beige', 'Cream', 'Khaki', 'Olive', 'Mustard', 'Rust', 'Brown', 'Maroon']);
 export const COOL = new Set<ColorKey>([
   'Navy', 'Blue', 'Light Blue', 'Charcoal', 'Purple', 'Forest Green',
 ]);
 /** Bold / expressive colours. */
 export const BOLD = new Set<ColorKey>([
-  'Burgundy', 'Rust', 'Mustard', 'Forest Green', 'Purple', 'Olive',
+  'Burgundy', 'Maroon', 'Rust', 'Mustard', 'Forest Green', 'Purple', 'Olive',
 ]);
-/** Clean / professional ("Corporate") set used by Office occasion + Classic style. */
+/** Clean / professional ("Corporate") set — the office lean + Classic style. */
 export const CORP = new Set<ColorKey>([
-  'Navy', 'Charcoal', 'Grey', 'White', 'Light Blue', 'Blue', 'Beige',
+  'Navy', 'Charcoal', 'Grey', 'White', 'Light Blue', 'Blue', 'Beige', 'Brown',
 ]);

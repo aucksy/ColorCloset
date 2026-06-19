@@ -1,10 +1,12 @@
 import { COLORS, KEYS, hx, lum, mix, nearest, rgb, rgbString, shadeHex } from '../../src/engine';
 
 describe('colours: palette + shade generation', () => {
-  it('has exactly the 16 named colours', () => {
-    expect(KEYS).toHaveLength(16);
+  it('has exactly the 18 named colours (incl. Brown + Maroon)', () => {
+    expect(KEYS).toHaveLength(18);
     expect(KEYS).toContain('Navy');
     expect(KEYS).toContain('Forest Green');
+    expect(KEYS).toContain('Brown');
+    expect(KEYS).toContain('Maroon');
   });
 
   it('parses hex to rgb', () => {

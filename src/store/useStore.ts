@@ -1,11 +1,9 @@
 /**
- * The single app store (Zustand + persist). The prototype's global `state` object
- * maps directly here. Persisted slice mirrors PRD §10; the session slice
- * (occasion / typeFilter / deck position / current pairing) is transient and
- * partialized out of persistence.
+ * The single app store (Zustand + persist). The session slice (deck position /
+ * current pairing) is transient and partialized out of persistence.
  *
  * The "Another" deck walk lives here as actions so every surface (card, save,
- * mark-worn, skin pill, chips) drives one consistent walk.
+ * mark-worn, swipe deck, style chips) drives one consistent walk.
  */
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
@@ -16,16 +14,16 @@ import {
   shadeHex,
   skinObj,
   stepRec,
-  type ClothType,
   type ColorKey,
   type DepthId,
-  type Occasion,
   type ShadeIndex,
   type StyleName,
-  type TypeFilter,
 } from '@/engine';
 import { todayStr } from '@/lib/date';
 import { activeStorage } from './storage';
+
+/** How the user browses the deck: the classic "Another" button or a swipe deck. */
+export type BrowseMode = 'classic' | 'swipe';
 
 export interface SavedLook {
   id: number;
@@ -34,7 +32,6 @@ export interface SavedLook {
   th: string; // top shade hex (frozen at save time)
   bh: string; // bottom shade hex
   name: string;
-  occ: Occasion;
   style: StyleName;
   date: string;
 }
@@ -48,17 +45,15 @@ interface PersistedState {
   // Each owned colour can hold several shades (light->dark) the user actually owns.
   shadeTops: Record<ColorKey, ShadeIndex[]>;
   shadeBottoms: Record<ColorKey, ShadeIndex[]>;
-  types: Record<ColorKey, ClothType[]>;
   worn: Record<string, string>;
   saved: SavedLook[];
   theme: 'dark' | 'light';
   style: StyleName;
+  browseMode: BrowseMode;
   setupComplete: boolean;
 }
 
 interface SessionState {
-  occasion: Occasion;
-  typeFilter: TypeFilter;
   current: { t: ColorKey; b: ColorKey } | null;
   currentName: string;
   deckPos: number;
@@ -72,22 +67,21 @@ interface Actions {
   toggleColor: (slot: Slot, key: ColorKey) => void;
   setColors: (slot: Slot, colors: ColorKey[]) => void;
   toggleShade: (slot: Slot, key: ColorKey, idx: ShadeIndex) => void;
-  addTypeToColors: (colors: ColorKey[], type: ClothType) => void;
   // deck walk
   regenerate: () => boolean;
   another: () => boolean;
+  next: () => void;
+  prev: () => void;
   markWorn: () => void;
   loadCombo: (t: ColorKey, b: ColorKey) => void;
   // controls
-  setOccasion: (o: Occasion) => void;
   setStyle: (s: StyleName) => void;
-  setTypeFilter: (f: TypeFilter) => void;
+  setBrowseMode: (m: BrowseMode) => void;
+  toggleBrowseMode: () => void;
   // saved / worn
   saveCurrent: () => void;
   deleteSaved: (id: number) => void;
   clearWorn: () => void;
-  // types
-  toggleType: (color: ColorKey, type: ClothType) => void;
   // settings
   setTheme: (t: 'dark' | 'light') => void;
   toggleTheme: () => void;
@@ -99,8 +93,6 @@ interface Actions {
 export type Store = PersistedState & SessionState & Actions;
 
 const SESSION_DEFAULTS: SessionState = {
-  occasion: 'Casual',
-  typeFilter: 'all',
   current: null,
   currentName: '',
   deckPos: -1,
@@ -113,13 +105,16 @@ const PERSISTED_DEFAULTS: PersistedState = {
   bottoms: [],
   shadeTops: {},
   shadeBottoms: {},
-  types: {},
   worn: {},
   saved: [],
   theme: 'dark',
   style: 'Minimal',
+  browseMode: 'classic',
   setupComplete: false,
 };
+
+const deckFor = (s: Store) =>
+  buildDeck({ tops: s.tops, bottoms: s.bottoms, skin: skinObj(s.depth), style: s.style });
 
 export const useStore = create<Store>()(
   persist(
@@ -158,17 +153,6 @@ export const useStore = create<Store>()(
         set({ [slot]: next, [shadeField]: shades } as Partial<Store>);
       },
 
-      addTypeToColors: (colors, type) => {
-        const s = get();
-        const types = { ...s.types };
-        colors.forEach((c) => {
-          const tagged = new Set(types[c] ?? []);
-          tagged.add(type);
-          types[c] = [...tagged];
-        });
-        set({ types });
-      },
-
       toggleShade: (slot, key, idx) => {
         const s = get();
         const shadeField = slot === 'tops' ? 'shadeTops' : 'shadeBottoms';
@@ -199,16 +183,7 @@ export const useStore = create<Store>()(
 
       another: () => {
         const s = get();
-        const skin = skinObj(s.depth);
-        const deck = buildDeck({
-          tops: s.tops,
-          bottoms: s.bottoms,
-          skin,
-          occ: s.occasion,
-          style: s.style,
-          types: s.types,
-          typeFilter: s.typeFilter,
-        });
+        const deck = deckFor(s);
         const r = stepRec(deck, s.deckPos, s.worn);
         if (!r) {
           set({ current: null, currentName: '', deckPos: -1 });
@@ -220,6 +195,27 @@ export const useStore = create<Store>()(
           deckPos: r.pos,
         });
         return r.roundDone;
+      },
+
+      // Linear step through the deck for swipe browsing — walks EVERY look in order
+      // (does not skip worn, so the "x of N" counter stays continuous).
+      next: () => {
+        const s = get();
+        const deck = deckFor(s);
+        if (!deck.length) return;
+        const n = deck.length;
+        const pos = ((s.deckPos === -1 ? -1 : s.deckPos) + 1) % n;
+        const pick = deck[pos];
+        set({ current: { t: pick.t, b: pick.b }, currentName: nameFor(pick.t, pick.b, s.style), deckPos: pos });
+      },
+      prev: () => {
+        const s = get();
+        const deck = deckFor(s);
+        if (!deck.length) return;
+        const n = deck.length;
+        const pos = (((s.deckPos === -1 ? 0 : s.deckPos) - 1) % n + n) % n;
+        const pick = deck[pos];
+        set({ current: { t: pick.t, b: pick.b }, currentName: nameFor(pick.t, pick.b, s.style), deckPos: pos });
       },
 
       markWorn: () => {
@@ -234,18 +230,12 @@ export const useStore = create<Store>()(
         set({ current: { t, b }, currentName: nameFor(t, b, get().style) });
       },
 
-      setOccasion: (o) => {
-        set({ occasion: o });
-        get().regenerate();
-      },
       setStyle: (st) => {
         set({ style: st });
         get().regenerate();
       },
-      setTypeFilter: (f) => {
-        set({ typeFilter: f });
-        get().regenerate();
-      },
+      setBrowseMode: (m) => set({ browseMode: m }),
+      toggleBrowseMode: () => set({ browseMode: get().browseMode === 'swipe' ? 'classic' : 'swipe' }),
 
       saveCurrent: () => {
         const s = get();
@@ -258,7 +248,6 @@ export const useStore = create<Store>()(
           th: shadeHex(t, s.shadeTops[t]?.[0]),
           bh: shadeHex(b, s.shadeBottoms[b]?.[0]),
           name: s.currentName || nameFor(t, b, s.style),
-          occ: s.occasion,
           style: s.style,
           date: todayStr(),
         };
@@ -266,18 +255,6 @@ export const useStore = create<Store>()(
       },
       deleteSaved: (id) => set({ saved: get().saved.filter((x) => x.id !== id) }),
       clearWorn: () => set({ worn: {} }),
-
-      toggleType: (color, type) => {
-        const s = get();
-        const arr = s.types[color] ? [...s.types[color]] : [];
-        const i = arr.indexOf(type);
-        if (i >= 0) arr.splice(i, 1);
-        else arr.push(type);
-        const types = { ...s.types };
-        if (arr.length) types[color] = arr;
-        else delete types[color];
-        set({ types });
-      },
 
       setTheme: (t) => set({ theme: t }),
       toggleTheme: () => set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
@@ -292,13 +269,15 @@ export const useStore = create<Store>()(
           ...SESSION_DEFAULTS,
           _hasHydrated: true,
           theme: get().theme, // keep the user's theme choice through a reset
+          browseMode: get().browseMode, // and their browse preference
         }),
     }),
     {
       name: 'colorcloset',
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => activeStorage),
-      // v1 stored one shade per colour (a number); v2 stores an array of shades.
+      // v1 stored one shade per colour (a number); v2+ stores an array of shades.
+      // v3 dropped the type-tagging + occasion fields (ignored on load automatically).
       migrate: (persisted: any, version) => {
         if (persisted && version < 2) {
           const toArr = (m: Record<string, unknown> | undefined) => {
@@ -319,11 +298,11 @@ export const useStore = create<Store>()(
         bottoms: s.bottoms,
         shadeTops: s.shadeTops,
         shadeBottoms: s.shadeBottoms,
-        types: s.types,
         worn: s.worn,
         saved: s.saved,
         theme: s.theme,
         style: s.style,
+        browseMode: s.browseMode,
         setupComplete: s.setupComplete,
       }),
       // Always flip the flag once persistence settles — even if reading storage

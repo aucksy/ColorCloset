@@ -2,17 +2,7 @@
  * Engine constants: occasions, styles, curated exemplar pairings, thresholds.
  * Ported verbatim from the prototype (lines ~655-682, 9.6 / 9.9 / Appendix B).
  */
-import type { ClothType, Occasion, StyleName } from './types';
-
-/** The three "Dress code" buckets, in order. The engine biases ranking per bucket;
- *  the user just picks how dressed-up they want to read and we decide the rest. */
-export const OCC: Occasion[] = ['Casual', 'Formal', 'Relaxed'];
-
-export const OCC_PHRASE: Record<Occasion, string> = {
-  Casual: 'a casual day',
-  Formal: 'a formal occasion',
-  Relaxed: 'a relaxed day',
-};
+import type { StyleName } from './types';
 
 export const STYLES: StyleName[] = ['Minimal', 'Classic', 'Bold', 'Statement'];
 
@@ -31,6 +21,7 @@ export const GOOD: Record<StyleName, [string, string][]> = {
     ['Grey', 'Charcoal'],
     ['Light Blue', 'Navy'],
     ['White', 'Charcoal'],
+    ['Brown', 'Beige'],
   ],
   Classic: [
     ['White', 'Navy'],
@@ -39,6 +30,8 @@ export const GOOD: Record<StyleName, [string, string][]> = {
     ['White', 'Burgundy'],
     ['Beige', 'Navy'],
     ['Grey', 'Navy'],
+    ['Brown', 'Cream'],
+    ['Maroon', 'Grey'],
   ],
   Bold: [
     ['Mustard', 'Navy'],
@@ -47,6 +40,8 @@ export const GOOD: Record<StyleName, [string, string][]> = {
     ['Blue', 'Mustard'],
     ['Olive', 'Beige'],
     ['Purple', 'Mustard'],
+    ['Maroon', 'Grey'],
+    ['Brown', 'Olive'],
   ],
   Statement: [
     ['Purple', 'Mustard'],
@@ -55,6 +50,8 @@ export const GOOD: Record<StyleName, [string, string][]> = {
     ['Blue', 'Rust'],
     ['Purple', 'Grey'],
     ['Burgundy', 'Beige'],
+    ['Maroon', 'Mustard'],
+    ['Brown', 'Mustard'],
   ],
 };
 
@@ -69,14 +66,6 @@ export const GOODSET: Set<string> = (() => {
   );
   return s;
 })();
-
-/** Optional clothing-type tags (Ethnic/Festive added for Indian wardrobes). */
-export const CLOTH: { id: ClothType; name: string }[] = [
-  { id: 'casual', name: 'Casual' },
-  { id: 'formal', name: 'Formal' },
-  { id: 'gym', name: 'Gym' },
-  { id: 'ethnic', name: 'Ethnic' },
-];
 
 /** Tunable thresholds (§9.9). Exact prototype values — the starting tuning. */
 export const UNIVERSE_THRESHOLD = 0.55;

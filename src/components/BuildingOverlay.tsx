@@ -21,13 +21,19 @@ const SUBS = [
 interface Props {
   total: number;
   onDone: () => void;
+  /** When set (the universe size before edits), the overlay counts up from here and
+   *  celebrates the "+N new" delta — used by the "Add more colours" flow. */
+  addedFrom?: number;
 }
 
 /** Brief payoff transition: counts up to the true universe size, then enters the app. */
-export function BuildingOverlay({ total, onDone }: Props) {
+export function BuildingOverlay({ total, onDone, addedFrom }: Props) {
   const t = useTheme();
   const motion = useMotion();
-  const [count, setCount] = useState(0);
+  const from = addedFrom ?? 0;
+  const delta = total - from;
+  const isAdd = addedFrom != null;
+  const [count, setCount] = useState(from);
   const [sub, setSub] = useState(SUBS[0]);
   const [ready, setReady] = useState(false);
   const spin = useSharedValue(0);
@@ -44,7 +50,7 @@ export function BuildingOverlay({ total, onDone }: Props) {
 
     spin.value = withRepeat(withTiming(1, { duration: 1000, easing: Easing.linear }), -1);
 
-    // count-up (cubic ease-out) starting ~700ms in
+    // count-up (cubic ease-out) starting ~700ms in — from the old total in add mode
     let raf = 0;
     const startCount = setTimeout(() => {
       const start = Date.now();
@@ -52,7 +58,7 @@ export function BuildingOverlay({ total, onDone }: Props) {
       const tick = () => {
         const p = Math.min(1, (Date.now() - start) / dur);
         const e = 1 - Math.pow(1 - p, 3);
-        setCount(Math.round(total * e));
+        setCount(Math.round(from + (total - from) * e));
         if (p < 1) raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
@@ -92,10 +98,16 @@ export function BuildingOverlay({ total, onDone }: Props) {
         <Text style={[styles.count, { color: t.ink, fontFamily: fonts.displaySemi }]}>{count}</Text>
       </View>
       <Text style={[styles.title, { color: t.ink, fontFamily: fonts.display }]}>
-        Building your combinations
+        {isAdd ? 'Updating your combinations' : 'Building your combinations'}
       </Text>
       <Text style={[styles.sub, { color: ready ? t.accent : t.muted, fontFamily: fonts.mono }]}>
-        {ready ? `${total} combinations ready` : `${sub}…`}
+        {ready
+          ? isAdd
+            ? delta > 0
+              ? `+${delta} new · ${total} combinations`
+              : `${total} combinations ready`
+            : `${total} combinations ready`
+          : `${sub}…`}
       </Text>
     </View>
   );

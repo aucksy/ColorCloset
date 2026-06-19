@@ -1,8 +1,9 @@
+import { useRouter } from 'expo-router';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CLOTH, OCC, STYLES, skinObj, uniStats, type Occasion, type StyleName, type TypeFilter } from '@/engine';
+import { STYLES, skinObj, uniStats, type StyleName } from '@/engine';
 import { Button } from '@/components/Button';
 import { ChipRow } from '@/components/ChipRow';
 import { Icon } from '@/components/Icon';
@@ -11,13 +12,13 @@ import { OutfitCard } from '@/components/OutfitCard';
 import { ProgressBar } from '@/components/ProgressBar';
 import { Segmented, type Pane } from '@/components/Segmented';
 import { SideMenu } from '@/components/SideMenu';
+import { SwipeDeck } from '@/components/SwipeDeck';
 import { Toast } from '@/components/Toast';
 import { WhatToBuyPane } from '@/components/WhatToBuyPane';
 import { AboutPanel } from '@/components/panels/AboutPanel';
 import { CombinationsPanel } from '@/components/panels/CombinationsPanel';
 import { SavedPanel } from '@/components/panels/SavedPanel';
 import { SkinPanel } from '@/components/panels/SkinPanel';
-import { TypeTaggingPanel } from '@/components/panels/TypeTaggingPanel';
 import { useMotion } from '@/theme/useMotion';
 import { useStore } from '@/store/useStore';
 import { useUiStore } from '@/store/uiStore';
@@ -26,24 +27,24 @@ import { useTheme } from '@/theme/useTheme';
 
 export default function Main() {
   const t = useTheme();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const motion = useMotion();
   const [pane, setPane] = useState<Pane>('rec');
 
   const current = useStore((s) => s.current);
-  const occasion = useStore((s) => s.occasion);
+  const deckPos = useStore((s) => s.deckPos);
   const style = useStore((s) => s.style);
-  const setOccasion = useStore((s) => s.setOccasion);
   const setStyle = useStore((s) => s.setStyle);
-  const typeFilter = useStore((s) => s.typeFilter);
-  const setTypeFilter = useStore((s) => s.setTypeFilter);
-  const types = useStore((s) => s.types);
+  const browseMode = useStore((s) => s.browseMode);
   const tops = useStore((s) => s.tops);
   const bottoms = useStore((s) => s.bottoms);
   const depth = useStore((s) => s.depth);
   const worn = useStore((s) => s.worn);
   const regenerate = useStore((s) => s.regenerate);
   const another = useStore((s) => s.another);
+  const next = useStore((s) => s.next);
+  const prev = useStore((s) => s.prev);
   const markWorn = useStore((s) => s.markWorn);
   const saveCurrent = useStore((s) => s.saveCurrent);
   const saved = useStore((s) => s.saved);
@@ -63,9 +64,8 @@ export default function Main() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Android back: unwind in-app state in the order the user arrived at it —
-  // overlay → drawer → "Colors to buy" tab → Style me. Only the bare Style-me
-  // screen falls through to let the OS exit (mirrors "back to where I came from").
+  // Android back: overlay → drawer → "Colors to buy" tab → Style me; only the bare
+  // Style-me screen falls through to let the OS exit.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (panel) {
@@ -87,7 +87,6 @@ export default function Main() {
 
   const skin = skinObj(depth);
   const { total, worn: wornCount } = uniStats(tops, bottoms, skin, worn);
-  const hasTags = Object.keys(types).some((k) => (types[k]?.length ?? 0) > 0);
   const isSaved = !!current && saved.some((x) => x.t === current.t && x.b === current.b);
 
   const onAnother = () => {
@@ -136,28 +135,12 @@ export default function Main() {
       >
         {pane === 'rec' ? (
           <Animated.View key="rec" entering={FadeIn.duration(motion.fast)}>
-            <Text style={[styles.chLabel, { color: t.faint, fontFamily: fonts.mono }]}>DRESS CODE</Text>
-            <ChipRow
-              items={OCC.map((o) => ({ value: o as Occasion, label: o }))}
-              value={occasion}
-              onChange={setOccasion}
-            />
             <Text style={[styles.chLabel, { color: t.faint, fontFamily: fonts.mono }]}>STYLE</Text>
             <ChipRow
               items={STYLES.map((s) => ({ value: s as StyleName, label: s }))}
               value={style}
               onChange={setStyle}
             />
-            {hasTags && (
-              <>
-                <Text style={[styles.chLabel, { color: t.faint, fontFamily: fonts.mono }]}>FOR</Text>
-                <ChipRow
-                  items={[{ value: 'all' as TypeFilter, label: 'All' }, ...CLOTH.map((c) => ({ value: c.id as TypeFilter, label: c.name }))]}
-                  value={typeFilter}
-                  onChange={setTypeFilter}
-                />
-              </>
-            )}
 
             <View style={styles.prog}>
               <ProgressBar pct={total ? Math.round((wornCount / total) * 100) : 0} />
@@ -169,48 +152,51 @@ export default function Main() {
             </View>
 
             {current ? (
-              <>
-                <OutfitCard />
-                <View style={styles.actions}>
-                  <Button
-                    title="Another"
-                    variant="goldline"
-                    onPress={onAnother}
-                    style={{ flex: 1 }}
-                    icon={<Icon name="refresh" size={18} color={t.goldSoft} strokeWidth={2.2} />}
-                  />
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={isSaved ? 'Saved' : 'Save look'}
-                    accessibilityState={{ selected: isSaved }}
-                    onPress={onSave}
-                    style={[styles.iconAct, { borderColor: isSaved ? t.accent : t.line2 }]}
-                  >
-                    <Icon name="bookmark" size={20} color={isSaved ? t.accent : t.ink} />
-                  </Pressable>
-                </View>
-                <View style={styles.worn}>
-                  <Button title="Mark it worn" onPress={onWore} icon={<Icon name="check" size={18} color={t.onGold} strokeWidth={2.6} />} />
-                </View>
-              </>
+              browseMode === 'swipe' ? (
+                <>
+                  <SwipeDeck pos={deckPos} total={total} onNext={next} onPrev={prev} onSave={onSave} />
+                  <View style={styles.worn}>
+                    <Button title="Mark it worn" onPress={onWore} icon={<Icon name="check" size={18} color={t.onGold} strokeWidth={2.6} />} />
+                  </View>
+                </>
+              ) : (
+                <>
+                  <OutfitCard />
+                  <View style={styles.actions}>
+                    <Button
+                      title="Another"
+                      variant="goldline"
+                      onPress={onAnother}
+                      style={{ flex: 1 }}
+                      icon={<Icon name="refresh" size={18} color={t.goldSoft} strokeWidth={2.2} />}
+                    />
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={isSaved ? 'Saved' : 'Save look'}
+                      accessibilityState={{ selected: isSaved }}
+                      onPress={onSave}
+                      style={[styles.iconAct, { borderColor: isSaved ? t.accent : t.line2 }]}
+                    >
+                      <Icon name="bookmark" size={20} color={isSaved ? t.accent : t.ink} />
+                    </Pressable>
+                  </View>
+                  <View style={styles.worn}>
+                    <Button title="Mark it worn" onPress={onWore} icon={<Icon name="check" size={18} color={t.onGold} strokeWidth={2.6} />} />
+                  </View>
+                </>
+              )
             ) : (
               <View style={styles.emptyRec}>
                 <View style={[styles.emptyIc, { backgroundColor: t.glass, borderColor: t.line }]}>
-                  <Icon name={total === 0 ? 'grid' : 'tags'} size={24} color={t.accent} />
+                  <Icon name="grid" size={24} color={t.accent} />
                 </View>
-                <Text style={[styles.emptyH, { color: t.ink, fontFamily: fonts.display }]}>
-                  {total === 0 ? 'No combinations yet' : 'Nothing matches this filter'}
-                </Text>
+                <Text style={[styles.emptyH, { color: t.ink, fontFamily: fonts.display }]}>No combinations yet</Text>
                 <Text style={[styles.emptyP, { color: t.muted, fontFamily: fonts.uiRegular }]}>
-                  {total === 0
-                    ? 'Add a few colours to your tops and bottoms from the menu → Set up again.'
-                    : `No looks use only ${typeFilter} colours. Switch “For” back to All to see everything.`}
+                  Add a few colours to your wardrobe to start seeing office looks.
                 </Text>
-                {total > 0 && (
-                  <View style={styles.emptyBtn}>
-                    <Button title="Show all" variant="goldline" onPress={() => setTypeFilter('all')} />
-                  </View>
-                )}
+                <View style={styles.emptyBtn}>
+                  <Button title="Add colours" variant="goldline" onPress={() => router.push({ pathname: '/onboarding', params: { mode: 'add' } })} />
+                </View>
               </View>
             )}
           </Animated.View>
@@ -226,7 +212,6 @@ export default function Main() {
       {panel === 'about' && <AboutPanel />}
       {panel === 'combos' && <CombinationsPanel />}
       {panel === 'saved' && <SavedPanel />}
-      {panel === 'types' && <TypeTaggingPanel />}
       <SideMenu />
       <Toast />
     </View>

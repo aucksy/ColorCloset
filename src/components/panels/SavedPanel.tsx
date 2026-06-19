@@ -35,7 +35,7 @@ export function SavedPanel() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.sn, { color: t.ink, fontFamily: fonts.display }]}>{it.name}</Text>
               <Text style={[styles.sd, { color: t.muted, fontFamily: fonts.mono }]}>
-                {it.t} + {it.b} · {it.occ} · {it.date}
+                {it.t} + {it.b} · {it.style} · {it.date}
               </Text>
             </View>
             <Pressable

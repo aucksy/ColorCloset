@@ -20,6 +20,8 @@ export function SideMenu() {
 
   const theme = useStore((s) => s.theme);
   const toggleTheme = useStore((s) => s.toggleTheme);
+  const browseMode = useStore((s) => s.browseMode);
+  const toggleBrowseMode = useStore((s) => s.toggleBrowseMode);
   const saved = useStore((s) => s.saved.length);
   const tops = useStore((s) => s.tops);
   const bottoms = useStore((s) => s.bottoms);
@@ -34,6 +36,10 @@ export function SideMenu() {
   const setupAgain = () => {
     closeDrawer();
     router.replace('/onboarding');
+  };
+  const addColours = () => {
+    closeDrawer();
+    router.push({ pathname: '/onboarding', params: { mode: 'add' } });
   };
   const reset = () => {
     Alert.alert('Reset wardrobe?', 'This clears your colours, saved looks and worn history.', [
@@ -65,29 +71,34 @@ export function SideMenu() {
           <Text style={[styles.brandTxt, { color: t.ink, fontFamily: fonts.uiBold }]}>ColorCloset</Text>
         </View>
 
-        <Item t={t} icon="setup" label="Set up again" onPress={setupAgain} />
-        <Item t={t} icon="pencil" label="Skin tone" onPress={() => openPanel('skin')} />
+        <Item t={t} icon="grid" label="Add more colours" onPress={addColours} />
         <Item t={t} icon="list" label="My combinations" onPress={() => openPanel('combos')} right={`${wornCount}/${total}`} />
         <Item t={t} icon="bookmark" label="Saved looks" onPress={() => openPanel('saved')} right={String(saved)} />
-        <Item t={t} icon="tags" label="Label by type" onPress={() => openPanel('types')} />
 
-        <Pressable onPress={toggleTheme} style={[styles.item]}>
-          <Icon name={theme === 'dark' ? 'moon' : 'sun'} size={19} color={t.muted} />
-          <Text style={[styles.itemTxt, { color: t.ink, fontFamily: fonts.ui }]}>
-            {theme === 'dark' ? 'Dark mode' : 'Light mode'}
-          </Text>
-          <View style={[styles.switch, { backgroundColor: theme === 'light' ? t.accent : t.track }]}>
-            <View style={[styles.knob, { left: theme === 'light' ? 21 : 3 }]} />
-          </View>
-        </Pressable>
+        <Toggle
+          t={t}
+          icon="refresh"
+          label="Swipe cards"
+          on={browseMode === 'swipe'}
+          onPress={toggleBrowseMode}
+        />
+        <Toggle
+          t={t}
+          icon={theme === 'dark' ? 'moon' : 'sun'}
+          label={theme === 'dark' ? 'Dark mode' : 'Light mode'}
+          on={theme === 'light'}
+          onPress={toggleTheme}
+        />
 
         <View style={[styles.div, { backgroundColor: t.line }]} />
 
+        <Item t={t} icon="pencil" label="Skin tone" onPress={() => openPanel('skin')} />
+        <Item t={t} icon="setup" label="Set up again" onPress={setupAgain} />
         <Item t={t} icon="info" label="How it works" onPress={() => openPanel('about')} />
         <Item t={t} icon="reset" label="Reset wardrobe" onPress={reset} />
 
         <Text style={[styles.foot, { color: t.faint, fontFamily: fonts.uiRegular }]}>
-          One job, done well: what to wear from what you own.
+          One job, done well: what to wear to the office from what you own.
         </Text>
       </Animated.View>
     </View>
@@ -112,6 +123,30 @@ function Item({
       <Icon name={icon} size={19} color={t.muted} />
       <Text style={[styles.itemTxt, { color: t.ink, fontFamily: fonts.ui }]}>{label}</Text>
       {right != null && <Text style={[styles.right, { color: t.muted, fontFamily: fonts.uiSemi }]}>{right}</Text>}
+    </Pressable>
+  );
+}
+
+function Toggle({
+  t,
+  icon,
+  label,
+  on,
+  onPress,
+}: {
+  t: ReturnType<typeof useTheme>;
+  icon: IconName;
+  label: string;
+  on: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="switch" accessibilityState={{ checked: on }} style={styles.item}>
+      <Icon name={icon} size={19} color={t.muted} />
+      <Text style={[styles.itemTxt, { color: t.ink, fontFamily: fonts.ui }]}>{label}</Text>
+      <View style={[styles.switch, { backgroundColor: on ? t.accent : t.track }]}>
+        <View style={[styles.knob, { left: on ? 21 : 3 }]} />
+      </View>
     </Pressable>
   );
 }

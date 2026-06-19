@@ -21,12 +21,12 @@ export const DEPTHS: { id: DepthId; name: string; dot: string }[] = [
  * saturated jewel tones and crisp whites; ashy/icy/muddy tones are kept out.
  */
 const DEPTH_FLATTER: Record<DepthId, ColorKey[]> = {
-  fair: ['Navy', 'Burgundy', 'Forest Green', 'Purple', 'Blue', 'Charcoal', 'Olive', 'White'],
-  light: ['Mustard', 'Navy', 'Burgundy', 'Rust', 'Blue', 'Forest Green', 'Purple', 'Olive'],
-  medium: ['Mustard', 'Rust', 'Forest Green', 'Burgundy', 'Olive', 'Purple', 'Cream', 'Khaki'],
-  tan: ['Rust', 'Mustard', 'Burgundy', 'Forest Green', 'Olive', 'Khaki', 'Cream', 'Blue'],
-  deep: ['Purple', 'Forest Green', 'Burgundy', 'Mustard', 'Blue', 'White', 'Rust', 'Navy'],
-  rich: ['White', 'Purple', 'Forest Green', 'Mustard', 'Blue', 'Burgundy', 'Navy', 'Light Blue'],
+  fair: ['Navy', 'Burgundy', 'Maroon', 'Forest Green', 'Purple', 'Blue', 'Charcoal', 'Olive', 'White'],
+  light: ['Mustard', 'Navy', 'Burgundy', 'Maroon', 'Rust', 'Blue', 'Forest Green', 'Purple', 'Olive'],
+  medium: ['Mustard', 'Rust', 'Forest Green', 'Burgundy', 'Maroon', 'Olive', 'Brown', 'Purple', 'Cream'],
+  tan: ['Rust', 'Brown', 'Mustard', 'Maroon', 'Burgundy', 'Forest Green', 'Olive', 'Khaki', 'Cream'],
+  deep: ['Purple', 'Forest Green', 'Burgundy', 'Maroon', 'Mustard', 'Brown', 'Blue', 'White', 'Rust'],
+  rich: ['White', 'Purple', 'Forest Green', 'Mustard', 'Maroon', 'Blue', 'Burgundy', 'Navy', 'Light Blue'],
 };
 
 const DEPTH_WORD: Record<DepthId, string> = {

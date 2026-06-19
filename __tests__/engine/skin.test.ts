@@ -3,7 +3,7 @@ import { flatterFor, skinObj, skinNote } from '../../src/engine';
 describe('flatterFor (depth-only, India-tuned, §9.4)', () => {
   it('returns the Medium depth set', () => {
     expect(flatterFor('medium')).toEqual([
-      'Mustard', 'Rust', 'Forest Green', 'Burgundy', 'Olive', 'Purple', 'Cream', 'Khaki',
+      'Mustard', 'Rust', 'Forest Green', 'Burgundy', 'Maroon', 'Olive', 'Brown', 'Purple', 'Cream',
     ]);
   });
 

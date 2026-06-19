@@ -6,9 +6,9 @@
  *  - whyFor returns structured segments (not an HTML string) for <Text> rendering.
  */
 import { BOLD, CORP, NEUTRAL } from './colors';
-import { GOODSET, OCC_PHRASE } from './constants';
+import { GOODSET } from './constants';
 import { catFor } from './scoring';
-import type { ColorKey, Occasion, StyleName } from './types';
+import type { ColorKey, StyleName } from './types';
 
 const NAMES: Record<string, string[]> = {
   NEUTRAL: ['Quiet Neutral', 'Clean Slate', 'Easy Classic'],
@@ -42,15 +42,13 @@ export interface RationaleSegment {
 
 /**
  * The "why this works" line, as ordered segments: [topName, connector, bottomName, tail].
- * Mirrors the prototype's whyFor branching exactly.
+ * Office-positioned phrasing (no occasion axis).
  */
 export function whyFor(
   t: ColorKey,
   b: ColorKey,
-  occ: Occasion,
   style?: StyleName | null
 ): RationaleSegment[] {
-  const o = OCC_PHRASE[occ] || 'any setting';
   const seg = (sep: string, tail: string): RationaleSegment[] => [
     { text: t, bold: true },
     { text: sep },
@@ -61,24 +59,24 @@ export function whyFor(
   if (style) {
     switch (style) {
       case 'Minimal':
-        return seg(' with ', ` is a quiet, pared-back pairing — clean and easy, and it works for ${o}.`);
+        return seg(' with ', ' is a quiet, pared-back pairing — clean, easy and office-ready.');
       case 'Classic':
-        return seg(' with ', ` is a timeless, put-together match — reliable and right for ${o}.`);
+        return seg(' with ', ' is a timeless, put-together match — reliable and office-ready.');
       case 'Bold':
-        return seg(' against ', ` brings warmth and presence — a standout choice for ${o}.`);
+        return seg(' against ', ' brings warmth and presence — a confident look that still works at work.');
       case 'Statement':
-        return seg(' with ', ` is an unexpected but considered match — distinctive, and a good fit for ${o}.`);
+        return seg(' with ', ' is an unexpected but considered match — distinctive, yet polished enough for the office.');
     }
   }
 
   const tN = NEUTRAL.has(t);
   const bN = NEUTRAL.has(b);
-  if (tN && bN) return seg(' with ', ` is a calm, fail-safe neutral pairing — balanced and right for ${o}.`);
-  if (BOLD.has(t) || BOLD.has(b)) return seg(' against ', ` adds warmth and presence — a confident pick for ${o}.`);
+  if (tN && bN) return seg(' with ', ' is a calm, fail-safe neutral pairing — balanced and office-ready.');
+  if (BOLD.has(t) || BOLD.has(b)) return seg(' against ', ' adds warmth and presence — a confident, office-friendly pick.');
   if (GOODSET.has(t + '|' + b) || GOODSET.has(b + '|' + t)) {
-    return seg(' and ', ` is a clean, classic match that always reads well for ${o}.`);
+    return seg(' and ', ' is a clean, classic match that always reads well at work.');
   }
-  return seg(' with ', ` balances nicely — an easy, wearable combination for ${o}.`);
+  return seg(' with ', ' balances nicely — an easy, wearable office combination.');
 }
 
 /** Flatten rationale segments into a plain string (accessibility labels / tests). */

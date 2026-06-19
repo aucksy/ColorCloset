@@ -34,14 +34,14 @@ export function gapSuggestions(
     if (!ownB.has(c)) {
       const pairs: ColorKey[] = [];
       tops.forEach((t) => {
-        if (score(t, c, skin, 'Casual') >= GAP_THRESHOLD) pairs.push(t);
+        if (score(t, c, skin) >= GAP_THRESHOLD) pairs.push(t);
       });
       if (pairs.length) asBottoms.push({ c, pairs, fl: flatter.includes(c) });
     }
     if (!ownT.has(c)) {
       const pairs: ColorKey[] = [];
       bottoms.forEach((b) => {
-        if (score(c, b, skin, 'Casual') >= GAP_THRESHOLD) pairs.push(b);
+        if (score(c, b, skin) >= GAP_THRESHOLD) pairs.push(b);
       });
       if (pairs.length) asTops.push({ c, pairs, fl: flatter.includes(c) });
     }

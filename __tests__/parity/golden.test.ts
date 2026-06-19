@@ -24,24 +24,15 @@ describe('golden: sample wardrobe', () => {
     for (let i = 1; i < uni.length; i++) expect(uni[i - 1].sc).toBeGreaterThanOrEqual(uni[i].sc);
   });
 
-  it.each([
-    ['Casual', 'Minimal'],
-    ['Formal', 'Classic'],
-    ['Relaxed', 'Bold'],
-  ] as const)('ranked deck for %s + %s matches the snapshot', (occ, style) => {
-    const deck = buildDeck({
-      tops: SAMPLE_TOPS,
-      bottoms: SAMPLE_BOTTOMS,
-      skin,
-      occ,
-      style,
-      types: {},
-      typeFilter: 'all',
-    });
-    // Same membership as the universe, only re-ordered.
-    expect(deck.length).toBe(uni.length);
-    expect(deck.map((c) => `${c.id}@${round(c.osc)}`)).toMatchSnapshot();
-  });
+  it.each(['Minimal', 'Classic', 'Bold', 'Statement'] as const)(
+    'ranked deck for %s matches the snapshot',
+    (style) => {
+      const deck = buildDeck({ tops: SAMPLE_TOPS, bottoms: SAMPLE_BOTTOMS, skin, style });
+      // Same membership as the universe, only re-ordered.
+      expect(deck.length).toBe(uni.length);
+      expect(deck.map((c) => `${c.id}@${round(c.osc)}`)).toMatchSnapshot();
+    }
+  );
 
   it('gap suggestions are stable', () => {
     const { asTops, asBottoms } = gapSuggestions(SAMPLE_TOPS, SAMPLE_BOTTOMS, skin);

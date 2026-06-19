@@ -3,7 +3,6 @@ import {
   comboUniverse,
   skinObj,
   stepRec,
-  typeOK,
   uniStats,
   type RankedCombo,
 } from '../../src/engine';
@@ -47,17 +46,6 @@ describe('uniStats', () => {
   });
 });
 
-describe('typeOK (untagged colours always pass)', () => {
-  const combo = { id: 'Navy|Grey', t: 'Navy', b: 'Grey', sc: 1 };
-  it('passes everything under "all"', () => {
-    expect(typeOK(combo, {}, 'all')).toBe(true);
-  });
-  it('matches the active filter, treating untagged sides as eligible', () => {
-    expect(typeOK(combo, { Navy: ['formal'] }, 'formal')).toBe(true); // Grey untagged -> passes
-    expect(typeOK(combo, { Navy: ['formal'] }, 'gym')).toBe(false); // Navy is formal-only
-  });
-});
-
 describe('stepRec (the "Another" walk)', () => {
   const deck = [
     { id: 'a' },
@@ -95,15 +83,12 @@ describe('stepRec (the "Another" walk)', () => {
 });
 
 describe('buildDeck', () => {
-  it('re-ranks the universe by the occasion/style score (osc)', () => {
+  it('re-ranks the universe by the style score (osc)', () => {
     const deck = buildDeck({
       tops: ['White', 'Burgundy'],
       bottoms: ['Grey', 'Navy'],
       skin,
-      occ: 'Casual',
       style: 'Bold',
-      types: {},
-      typeFilter: 'all',
     });
     expect(deck.length).toBeGreaterThan(0);
     for (let i = 1; i < deck.length; i++) expect(deck[i - 1].osc).toBeGreaterThanOrEqual(deck[i].osc);

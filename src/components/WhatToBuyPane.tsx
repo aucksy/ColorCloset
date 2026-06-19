@@ -40,7 +40,7 @@ export function WhatToBuyPane() {
         <>
           {asBottoms.length > 0 && (
             <View style={styles.section}>
-              <Text style={[styles.secH, { color: t.accent, fontFamily: fonts.mono }]}>BOTTOMS TO ADD</Text>
+              <Text style={[styles.secH, { color: t.ink, fontFamily: fonts.display }]}>Bottoms to buy</Text>
               {asBottoms.slice(0, 3).map((s, i) => (
                 <BuyCard key={s.c} suggestion={s} slot="bottoms" index={i} />
               ))}
@@ -48,7 +48,7 @@ export function WhatToBuyPane() {
           )}
           {asTops.length > 0 && (
             <View style={styles.section}>
-              <Text style={[styles.secH, { color: t.accent, fontFamily: fonts.mono }]}>TOPS TO ADD</Text>
+              <Text style={[styles.secH, { color: t.ink, fontFamily: fonts.display }]}>Tops to buy</Text>
               {asTops.slice(0, 3).map((s, i) => (
                 <BuyCard key={s.c} suggestion={s} slot="tops" index={i} />
               ))}
@@ -69,8 +69,8 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 10, letterSpacing: 2.2, marginBottom: 8 },
   h: { fontSize: 23, marginBottom: 6 },
   p: { fontSize: 13, lineHeight: 20 },
-  section: { marginBottom: 18 },
-  secH: { fontSize: 11, letterSpacing: 1.4, marginBottom: 13, marginLeft: 2 },
+  section: { marginBottom: 22 },
+  secH: { fontSize: 21, letterSpacing: -0.2, marginBottom: 14, marginLeft: 2 },
   foot: { fontSize: 11.5, lineHeight: 17, marginTop: 14, textAlign: 'center' },
   empty: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 20 },
   emptyIc: { width: 56, height: 56, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },

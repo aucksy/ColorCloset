@@ -43,19 +43,19 @@ describe('styleBias (§9.6)', () => {
 });
 
 describe('score (combined) is NOT clamped', () => {
-  it('sums harmony + flatter + dress-code + style', () => {
+  it('sums harmony + flatter + office lean + style', () => {
     const skin = skinObj('medium');
-    // Mustard+Navy @ Casual/Bold, Medium skin:
-    // harmony 1.0 (clamped) + flatter (Mustard .08) + Casual (neutral bottom .05 +
-    // high-contrast .04) + Bold style .37 = 1.54
-    expect(score('Mustard', 'Navy', skin, 'Casual', 'Bold')).toBeCloseTo(1.54, 10);
+    // Mustard+Navy @ Bold, Medium skin:
+    // harmony 1.0 (clamped) + flatter (Mustard .08) + office lean (CORP Navy .04 +
+    // neutral bottom Navy .03) + Bold style .37 = 1.52
+    expect(score('Mustard', 'Navy', skin, 'Bold')).toBeCloseTo(1.52, 10);
   });
 
-  it('Formal eases off bold colours that Casual rewards', () => {
+  it('rewards a corporate, flattering office pairing', () => {
     const skin = skinObj('medium');
-    // Burgundy (bold, not corporate) reads better Casual than Formal.
-    expect(score('Burgundy', 'Grey', skin, 'Casual', 'Classic')).toBeGreaterThan(
-      score('Burgundy', 'Grey', skin, 'Formal', 'Classic')
+    // The office lean means a clean corporate pairing out-scores a clashing one.
+    expect(score('White', 'Navy', skin, 'Classic')).toBeGreaterThan(
+      score('Olive', 'Blue', skin, 'Classic')
     );
   });
 });

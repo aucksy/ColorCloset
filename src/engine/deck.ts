@@ -5,21 +5,12 @@
  */
 import { score } from './scoring';
 import { UNIVERSE_THRESHOLD } from './constants';
-import type {
-  ClothType,
-  ColorKey,
-  Combo,
-  Occasion,
-  RankedCombo,
-  SkinObj,
-  StyleName,
-  TypeFilter,
-} from './types';
+import type { ColorKey, Combo, RankedCombo, SkinObj, StyleName } from './types';
 
 /**
- * Every (top × bottom) whose base score (dress code "Casual", no style) meets the
- * universe threshold (0.55), best-first. Stable across dress-code/style. If nothing
- * clears the threshold, returns the single best pairing so the user is never stuck.
+ * Every (top × bottom) whose base score (no style) meets the universe threshold
+ * (0.55), best-first. Stable across style. If nothing clears the threshold, returns
+ * the single best pairing so the user is never stuck.
  */
 export function comboUniverse(
   tops: ColorKey[],
@@ -29,7 +20,7 @@ export function comboUniverse(
   const out: Combo[] = [];
   tops.forEach((t) =>
     bottoms.forEach((b) => {
-      const sc = score(t, b, skin, 'Casual');
+      const sc = score(t, b, skin);
       if (sc >= UNIVERSE_THRESHOLD) out.push({ id: t + '|' + b, t, b, sc });
     })
   );
@@ -37,7 +28,7 @@ export function comboUniverse(
     let best: Combo | null = null;
     tops.forEach((t) =>
       bottoms.forEach((b) => {
-        const sc = score(t, b, skin, 'Casual');
+        const sc = score(t, b, skin);
         if (!best || sc > best.sc) best = { id: t + '|' + b, t, b, sc };
       })
     );
@@ -64,48 +55,22 @@ export function uniStats(
   return { uni, total: uni.length, worn: w };
 }
 
-/**
- * Type-filter predicate. Untagged colours always pass, so partial tagging still
- * works (a pairing is eligible if each side is untagged or tagged with the filter).
- */
-export function typeOK(
-  c: Combo,
-  types: Record<ColorKey, ClothType[]>,
-  typeFilter: TypeFilter
-): boolean {
-  if (typeFilter === 'all') return true;
-  const tt = types[c.t] || [];
-  const bt = types[c.b] || [];
-  return (tt.length === 0 || tt.includes(typeFilter)) && (bt.length === 0 || bt.includes(typeFilter));
-}
-
 export interface DeckContext {
   tops: ColorKey[];
   bottoms: ColorKey[];
   skin: SkinObj | null;
-  occ: Occasion;
   style: StyleName;
-  types: Record<ColorKey, ClothType[]>;
-  typeFilter: TypeFilter;
 }
 
 /** Memo key — when this string is unchanged, the deck need not be rebuilt. */
 export function deckKey(ctx: DeckContext): string {
-  return [
-    ctx.occ,
-    ctx.style,
-    ctx.skin?.depth ?? '',
-    ctx.typeFilter,
-    ctx.tops.join(','),
-    ctx.bottoms.join(','),
-  ].join('|');
+  return [ctx.style, ctx.skin?.depth ?? '', ctx.tops.join(','), ctx.bottoms.join(',')].join('|');
 }
 
-/** The universe re-scored for the current context and sorted best-first. */
+/** The universe re-scored for the current style and sorted best-first. */
 export function buildDeck(ctx: DeckContext): RankedCombo[] {
   return comboUniverse(ctx.tops, ctx.bottoms, ctx.skin)
-    .filter((c) => typeOK(c, ctx.types, ctx.typeFilter))
-    .map((c) => ({ ...c, osc: score(c.t, c.b, ctx.skin, ctx.occ, ctx.style) }))
+    .map((c) => ({ ...c, osc: score(c.t, c.b, ctx.skin, ctx.style) }))
     .sort((a, b) => b.osc - a.osc);
 }
 
