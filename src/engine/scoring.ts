@@ -3,7 +3,7 @@
  * score = harmony + flatter bonuses + gentle office lean + style bias.
  * Weights are the prototype's tuning, adapted for the office-attire positioning.
  */
-import { BOLD, COOL, CORP, NEUTRAL, WARM, lum } from './colors';
+import { BOLD, COOL, CORP, FAMILY, NEUTRAL, WARM, bottomScore, lum } from './colors';
 import { GOOD, GOODSET } from './constants';
 import type { ColorKey, SkinObj, StyleName } from './types';
 
@@ -23,6 +23,10 @@ export function harmony(t: ColorKey, b: ColorKey): number {
   if (!tN && !bN) {
     if ((WARM.has(t) && COOL.has(b)) || (COOL.has(t) && WARM.has(b))) s -= 0.14;
   }
+  // Flatness penalties: the same colour top+bottom (Beige+Beige) reads dead; two
+  // colours of the same family at near-equal value (Burgundy+Maroon, Beige+Khaki) too.
+  if (t === b) s -= 0.22;
+  else if (FAMILY[t] === FAMILY[b] && dl < 0.14) s -= 0.12;
   return Math.max(0, Math.min(1, s));
 }
 
@@ -73,15 +77,19 @@ export function score(
   style?: StyleName | null
 ): number {
   let s = harmony(t, b);
+  // Skin depth (a moderate re-rank signal): favoured colours lift, "avoid" colours
+  // drop — strong enough to visibly reorder for deep vs fair skin, not to bury a pick.
   const fl = skin ? skin.flatter : [];
-  if (fl.includes(t)) s += 0.08;
+  const av = skin ? skin.avoid : [];
+  if (fl.includes(t)) s += 0.09;
   if (fl.includes(b)) s += 0.06;
-  // Gentle office lean: clean/corporate colours read a touch better by default,
-  // and a grounded neutral trouser is the office staple. The neutral-bottom nudge
-  // only applies when the trouser isn't already counted as corporate (no double-up).
+  if (av.includes(t)) s -= 0.08;
+  if (av.includes(b)) s -= 0.06;
+  // Office lean on the top, and bottom-slot suitability: real office trousers (navy,
+  // grey, charcoal, khaki...) lift; implausible trousers (mustard, maroon, rust) drop.
   if (CORP.has(t)) s += 0.03;
-  if (CORP.has(b)) s += 0.04;
-  else if (NEUTRAL.has(b)) s += 0.03;
+  s += 0.06 * bottomScore(b);
+  if (bottomScore(b) < 0.25) s -= 0.1;
   s += styleBias(t, b, style);
   return s;
 }

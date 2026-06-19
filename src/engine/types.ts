@@ -39,6 +39,8 @@ export interface SkinObj {
   dot: string;
   /** Colours that tend to flatter this skin depth (max 9). */
   flatter: ColorKey[];
+  /** Colours that tend to read off (washed-out / ashy) for this depth. */
+  avoid: ColorKey[];
   note: string;
 }
 

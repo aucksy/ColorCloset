@@ -42,22 +42,26 @@ describe('styleBias (§9.6)', () => {
   });
 });
 
-describe('score (combined) is NOT clamped', () => {
-  it('sums harmony + flatter + office lean + style', () => {
-    const skin = skinObj('medium');
-    // Mustard+Navy @ Bold, Medium skin:
-    // harmony 1.0 (clamped) + flatter (Mustard .08) + office lean (CORP Navy .04;
-    // the neutral-bottom nudge is skipped since Navy is already corporate) +
-    // Bold style .37 = 1.49
-    expect(score('Mustard', 'Navy', skin, 'Bold')).toBeCloseTo(1.49, 10);
-  });
+describe('score (office engine behaviours)', () => {
+  const skin = skinObj('medium');
 
-  it('rewards a corporate, flattering office pairing', () => {
-    const skin = skinObj('medium');
-    // The office lean means a clean corporate pairing out-scores a clashing one.
+  it('rewards a corporate office pairing over a clashing one', () => {
     expect(score('White', 'Navy', skin, 'Classic')).toBeGreaterThan(
       score('Olive', 'Blue', skin, 'Classic')
     );
+  });
+
+  it('demotes an implausible trouser colour (nobody wears mustard trousers)', () => {
+    expect(score('White', 'Navy', skin)).toBeGreaterThan(score('White', 'Mustard', skin));
+  });
+
+  it('penalises a flat same-colour pairing (Beige+Beige)', () => {
+    expect(score('White', 'Navy', skin)).toBeGreaterThan(score('Beige', 'Beige', skin));
+  });
+
+  it('skin depth reorders: deep skin favours crisp White over ashy Beige as a top', () => {
+    const deep = skinObj('deep');
+    expect(score('White', 'Navy', deep)).toBeGreaterThan(score('Beige', 'Navy', deep));
   });
 });
 

@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Extrapolation,
@@ -7,11 +7,15 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withSequence,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { Icon } from '@/components/Icon';
 import { OutfitCard } from '@/components/OutfitCard';
-import { fonts } from '@/theme/fonts';
+import { hapticLight, hapticSuccess } from '@/lib/haptics';
+import { useStore } from '@/store/useStore';
 import { useTheme } from '@/theme/useTheme';
 
 interface Props {
@@ -23,30 +27,53 @@ interface Props {
 }
 
 /**
- * Tinder-style browse: drag the card left/right to walk every look in order; the
- * "x of N" counter updates as each new card lands. Double-tap saves. (Mark-worn is
- * a separate button outside the deck.)
- *
- * The card flies off-screen on a committed swipe; the store advances `current`
- * (changing `pos`), and only THEN — keyed on the new `pos` — does the card slide
- * back from the edge with the new look. This ordering avoids the old card snapping
- * back to centre before the content swaps.
+ * Tinder-style browse. The card sits on a visible stack so it reads as swipeable; on
+ * first use it nudges itself left/right once. A light flick (low distance OR velocity)
+ * commits; the card flies off, the store advances, and — keyed on the new pos — the
+ * next card slides in. Haptics fire on each swipe; double-tap saves with a heart burst.
  */
 export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
   const t = useTheme();
   const { width } = useWindowDimensions();
   const tx = useSharedValue(0);
-  const THRESH = width * 0.26;
+  const heart = useSharedValue(0);
+  const THRESH = width * 0.18;
+  const FLICK = 650;
   const OFF = width * 1.2;
 
-  // Once the new look is committed (pos changed), bring the card in from the edge.
+  const hintSeen = useStore((s) => s.swipeHintSeen);
+  const markHintSeen = useStore((s) => s.markSwipeHintSeen);
+
+  // First-time affordance: a gentle left/right nudge so the user sees it's swipeable.
   useEffect(() => {
-    tx.value = withTiming(0, { duration: 170 });
+    if (!hintSeen) {
+      tx.value = withDelay(
+        450,
+        withSequence(
+          withTiming(-46, { duration: 320 }),
+          withTiming(32, { duration: 300 }),
+          withSpring(0, { damping: 14, stiffness: 140 })
+        )
+      );
+      const id = setTimeout(markHintSeen, 1600);
+      return () => clearTimeout(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // After the new look commits (pos changed), slide the next card in from the edge.
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    tx.value = withTiming(0, { duration: 180 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pos]);
 
   const pan = Gesture.Pan()
-    .activeOffsetX([-12, 12])
+    .activeOffsetX([-8, 8])
     .onUpdate((e) => {
       tx.value = e.translationX;
     })
@@ -55,12 +82,16 @@ export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
         tx.value = withSpring(0, { damping: 18, stiffness: 180 });
         return;
       }
-      if (e.translationX <= -THRESH) {
-        tx.value = withTiming(-OFF, { duration: 190 }, (fin) => {
-          if (fin) runOnJS(onNext)(); // pos changes -> the effect slides the new card in
+      const goNext = e.translationX <= -THRESH || e.velocityX <= -FLICK;
+      const goPrev = e.translationX >= THRESH || e.velocityX >= FLICK;
+      if (goNext) {
+        runOnJS(hapticLight)();
+        tx.value = withTiming(-OFF, { duration: 180 }, (fin) => {
+          if (fin) runOnJS(onNext)();
         });
-      } else if (e.translationX >= THRESH) {
-        tx.value = withTiming(OFF, { duration: 190 }, (fin) => {
+      } else if (goPrev) {
+        runOnJS(hapticLight)();
+        tx.value = withTiming(OFF, { duration: 180 }, (fin) => {
           if (fin) runOnJS(onPrev)();
         });
       } else {
@@ -72,7 +103,12 @@ export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
     .numberOfTaps(2)
     .maxDuration(280)
     .onEnd(() => {
+      runOnJS(hapticSuccess)();
       runOnJS(onSave)();
+      heart.value = withSequence(
+        withTiming(1, { duration: 150 }),
+        withDelay(280, withTiming(0, { duration: 220 }))
+      );
     });
 
   const gesture = Gesture.Race(doubleTap, pan);
@@ -82,24 +118,26 @@ export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
       { translateX: tx.value },
       { rotate: `${interpolate(tx.value, [-width, 0, width], [-7, 0, 7], Extrapolation.CLAMP)}deg` },
     ],
-    opacity: interpolate(Math.abs(tx.value), [0, width * 0.85], [1, 0.35], Extrapolation.CLAMP),
+    opacity: interpolate(Math.abs(tx.value), [0, width * 0.85], [1, 0.4], Extrapolation.CLAMP),
   }));
 
-  const display = (pos < 0 ? 0 : pos) + 1;
+  const heartStyle = useAnimatedStyle(() => ({
+    opacity: heart.value,
+    transform: [{ scale: interpolate(heart.value, [0, 1], [0.4, 1.25]) }],
+  }));
 
   return (
-    <View>
-      <View style={styles.counterRow}>
-        <Text style={[styles.counter, { color: t.muted, fontFamily: fonts.monoBold }]}>
-          <Text style={{ color: t.accent }}>{display}</Text> of {total}
-        </Text>
-        <Text style={[styles.hint, { color: t.faint, fontFamily: fonts.uiRegular }]}>
-          Swipe to browse · double-tap to save
-        </Text>
-      </View>
+    <View style={styles.stage}>
+      {/* stacked ghosts behind, so it reads as a deck of cards */}
+      <View pointerEvents="none" style={[styles.ghost, styles.ghost2, { backgroundColor: t.glass, borderColor: t.line }]} />
+      <View pointerEvents="none" style={[styles.ghost, styles.ghost1, { backgroundColor: t.glass2, borderColor: t.line }]} />
+
       <GestureDetector gesture={gesture}>
-        <Animated.View style={cardStyle}>
+        <Animated.View style={[styles.card, { backgroundColor: t.surface, borderColor: t.line }, cardStyle]}>
           <OutfitCard />
+          <Animated.View pointerEvents="none" style={[styles.heart, heartStyle]}>
+            <Icon name="heart-fill" size={96} color={t.accent} />
+          </Animated.View>
         </Animated.View>
       </GestureDetector>
     </View>
@@ -107,7 +145,10 @@ export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
 }
 
 const styles = StyleSheet.create({
-  counterRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 },
-  counter: { fontSize: 13 },
-  hint: { fontSize: 11 },
+  stage: { position: 'relative', marginTop: 4 },
+  card: { borderRadius: 24, borderWidth: 1, paddingTop: 14, paddingHorizontal: 12, paddingBottom: 18, overflow: 'hidden' },
+  ghost: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 24, borderWidth: 1 },
+  ghost1: { transform: [{ translateY: 9 }, { scaleX: 0.955 }], opacity: 0.7 },
+  ghost2: { transform: [{ translateY: 18 }, { scaleX: 0.91 }], opacity: 0.4 },
+  heart: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
 });

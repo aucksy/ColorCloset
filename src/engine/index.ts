@@ -12,3 +12,4 @@ export * from './deck';
 export * from './gap';
 export * from './naming';
 export * from './leather';
+export * from './heritage';

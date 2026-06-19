@@ -83,8 +83,9 @@ const svg = (inner, k = 1) =>
 const tile = `<rect width="${VB}" height="${VB}" fill="url(#bg)"/>`;
 const sheen = `<rect width="${VB}" height="${VB}" fill="url(#sheen)"/>`;
 
-// Full-bleed launcher icon (the OS masks the corners): tile + armoire + sheen.
-const iconSvg = svg(`${tile}${armoire(1)}${sheen}`, 1);
+// Full-bleed launcher icon (the OS masks the corners, sometimes to a circle): keep
+// the wardrobe well inside the tile so it never crowds the edge or gets clipped.
+const iconSvg = svg(`${tile}${armoire(0.78)}${sheen}`, 0.78);
 
 // Android adaptive foreground: armoire only, transparent, inside the ~66% safe zone.
 const foregroundSvg = svg(armoire(0.82), 0.82);

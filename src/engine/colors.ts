@@ -132,3 +132,54 @@ export const BOLD = new Set<ColorKey>([
 export const CORP = new Set<ColorKey>([
   'Navy', 'Charcoal', 'Grey', 'White', 'Light Blue', 'Blue', 'Beige', 'Brown',
 ]);
+
+/**
+ * How realistic each colour is as TROUSERS/BOTTOMS (0..1), from menswear research.
+ * Used to demote implausible trousers (nobody wears mustard/maroon/rust trousers in
+ * an office) — both in ranking and in the "colours to buy" gap engine. Never deletes.
+ */
+export const BOTTOM: Record<ColorKey, number> = {
+  Navy: 1.0,
+  Grey: 0.97,
+  Charcoal: 0.97,
+  Khaki: 0.95,
+  Black: 0.92,
+  Beige: 0.9,
+  Brown: 0.88,
+  Olive: 0.85,
+  Cream: 0.72,
+  White: 0.6,
+  Blue: 0.45,
+  'Light Blue': 0.2,
+  'Forest Green': 0.2,
+  Burgundy: 0.18,
+  Maroon: 0.15,
+  Rust: 0.12,
+  Mustard: 0.08,
+  Purple: 0.08,
+};
+
+/** Bottom-suitability with a safe default for unknown keys. */
+export const bottomScore = (k: ColorKey): number => BOTTOM[k] ?? 0.5;
+
+/** Colour families — two colours in the same family at near-equal value read flat. */
+export const FAMILY: Record<ColorKey, string> = {
+  White: 'white',
+  Cream: 'warmneutral',
+  Beige: 'warmneutral',
+  Khaki: 'warmneutral',
+  Brown: 'warmneutral',
+  Grey: 'grey',
+  Charcoal: 'grey',
+  Black: 'black',
+  'Light Blue': 'blue',
+  Blue: 'blue',
+  Navy: 'blue',
+  Olive: 'green',
+  'Forest Green': 'green',
+  Burgundy: 'darkred',
+  Maroon: 'darkred',
+  Mustard: 'mustard',
+  Rust: 'rust',
+  Purple: 'purple',
+};

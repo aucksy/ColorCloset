@@ -20,28 +20,47 @@ export const DEPTHS: { id: DepthId; name: string; dot: string }[] = [
  * jewel tones + deep anchors for contrast; Medium→Rich lean into warm earth +
  * saturated jewel tones and crisp whites; ashy/icy/muddy tones are kept out.
  */
+// Colours that flatter each depth (favour). Aligned with colour-analysis research:
+// fair/light target medium contrast (jewel tones, Charcoal over stark Black/White);
+// deep/rich carry crisp White + saturated brights; pale near-skin tones wash out.
 const DEPTH_FLATTER: Record<DepthId, ColorKey[]> = {
-  fair: ['Navy', 'Burgundy', 'Maroon', 'Forest Green', 'Purple', 'Blue', 'Charcoal', 'Olive', 'White'],
-  light: ['Mustard', 'Navy', 'Burgundy', 'Maroon', 'Rust', 'Blue', 'Forest Green', 'Purple', 'Olive'],
-  medium: ['Mustard', 'Rust', 'Forest Green', 'Burgundy', 'Maroon', 'Olive', 'Brown', 'Purple', 'Cream'],
-  tan: ['Rust', 'Brown', 'Mustard', 'Maroon', 'Burgundy', 'Forest Green', 'Olive', 'Khaki', 'Cream'],
-  deep: ['Purple', 'Forest Green', 'Burgundy', 'Maroon', 'Mustard', 'Brown', 'Blue', 'White', 'Rust'],
-  rich: ['White', 'Purple', 'Forest Green', 'Mustard', 'Maroon', 'Blue', 'Burgundy', 'Navy', 'Light Blue'],
+  fair: ['Navy', 'Burgundy', 'Forest Green', 'Purple', 'Maroon', 'Charcoal', 'Light Blue', 'Blue', 'Grey'],
+  light: ['Navy', 'Blue', 'Light Blue', 'Burgundy', 'Maroon', 'Purple', 'Forest Green', 'Charcoal', 'Grey'],
+  medium: ['Navy', 'Blue', 'Burgundy', 'Maroon', 'Forest Green', 'Olive', 'Rust', 'Mustard', 'Brown'],
+  tan: ['Olive', 'Rust', 'Mustard', 'Brown', 'Khaki', 'Forest Green', 'Burgundy', 'Maroon', 'Navy'],
+  deep: ['White', 'Cream', 'Light Blue', 'Burgundy', 'Maroon', 'Forest Green', 'Purple', 'Navy', 'Blue'],
+  rich: ['White', 'Cream', 'Light Blue', 'Forest Green', 'Purple', 'Burgundy', 'Maroon', 'Blue', 'Mustard'],
+};
+
+// Colours that tend to read off for each depth (washed-out / ashy). Demoted, never excluded.
+const DEPTH_AVOID: Record<DepthId, ColorKey[]> = {
+  fair: ['White', 'Black', 'Cream', 'Beige', 'Mustard', 'Khaki', 'Rust'],
+  light: ['Black', 'White', 'Khaki', 'Olive'],
+  medium: ['Beige', 'Cream'],
+  tan: ['Beige'],
+  deep: ['Beige', 'Khaki', 'Olive', 'Grey'],
+  rich: ['Beige', 'Khaki', 'Olive', 'Grey', 'Black'],
 };
 
 const DEPTH_WORD: Record<DepthId, string> = {
-  fair: 'Jewel tones and deep anchors',
-  light: 'Warm brights and jewel tones',
+  fair: 'Jewel tones and softer darks at medium contrast',
+  light: 'Cool jewel tones and medium contrast',
   medium: 'Warm, earthy and jewel tones',
-  tan: 'Rich earthy and saturated jewel tones',
-  deep: 'Bold saturated tones and crisp whites',
-  rich: 'High-saturation brights and crisp contrast',
+  tan: 'Rich warm earths and saturated jewel tones',
+  deep: 'Crisp whites and saturated jewel tones at high contrast',
+  rich: 'Bright, high-contrast colour and crisp white',
 };
 
 /** Flatter set for a depth (max 9). */
 export function flatterFor(depth: DepthId | null | undefined): ColorKey[] {
   const d = depth ?? 'medium';
   return (DEPTH_FLATTER[d] ?? DEPTH_FLATTER.medium).slice(0, 9);
+}
+
+/** Colours to de-emphasise for a depth. */
+export function avoidFor(depth: DepthId | null | undefined): ColorKey[] {
+  const d = depth ?? 'medium';
+  return DEPTH_AVOID[d] ?? DEPTH_AVOID.medium;
 }
 
 /** One-line plain-language note describing what tends to flatter the selected depth. */
@@ -60,6 +79,7 @@ export function skinObj(depth: DepthId | null | undefined): SkinObj {
     short: d.name,
     dot: d.dot,
     flatter: flatterFor(d.id),
+    avoid: avoidFor(d.id),
     note: skinNote(d.id),
   };
 }

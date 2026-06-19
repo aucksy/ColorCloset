@@ -25,6 +25,17 @@ import { activeStorage } from './storage';
 /** How the user browses the deck: the classic "Another" button or a swipe deck. */
 export type BrowseMode = 'classic' | 'swipe';
 
+/** Selectable in-app brand mark (tested from the sidebar). */
+export type LogoVariant = 'armoire' | 'ring' | 'wheel' | 'hanger' | 'medallion';
+
+/** Daily outfit-reminder settings. days = weekday numbers 1=Sun .. 7=Sat (expo). */
+export interface NotifySettings {
+  enabled: boolean;
+  hour: number;
+  minute: number;
+  days: number[];
+}
+
 export interface SavedLook {
   id: number;
   t: ColorKey;
@@ -50,6 +61,9 @@ interface PersistedState {
   theme: 'dark' | 'light';
   style: StyleName;
   browseMode: BrowseMode;
+  logoVariant: LogoVariant;
+  swipeHintSeen: boolean;
+  notify: NotifySettings;
   setupComplete: boolean;
 }
 
@@ -78,6 +92,9 @@ interface Actions {
   setStyle: (s: StyleName) => void;
   setBrowseMode: (m: BrowseMode) => void;
   toggleBrowseMode: () => void;
+  setLogoVariant: (v: LogoVariant) => void;
+  markSwipeHintSeen: () => void;
+  setNotify: (patch: Partial<NotifySettings>) => void;
   // saved / worn
   saveCurrent: () => void;
   deleteSaved: (id: number) => void;
@@ -110,6 +127,9 @@ const PERSISTED_DEFAULTS: PersistedState = {
   theme: 'dark',
   style: 'Minimal',
   browseMode: 'classic',
+  logoVariant: 'armoire',
+  swipeHintSeen: false,
+  notify: { enabled: false, hour: 8, minute: 0, days: [1, 2, 3, 4, 5, 6, 7] },
   setupComplete: false,
 };
 
@@ -242,6 +262,9 @@ export const useStore = create<Store>()(
       },
       setBrowseMode: (m) => set({ browseMode: m }),
       toggleBrowseMode: () => set({ browseMode: get().browseMode === 'swipe' ? 'classic' : 'swipe' }),
+      setLogoVariant: (v) => set({ logoVariant: v }),
+      markSwipeHintSeen: () => set({ swipeHintSeen: true }),
+      setNotify: (patch) => set({ notify: { ...get().notify, ...patch } }),
 
       saveCurrent: () => {
         const s = get();
@@ -269,14 +292,20 @@ export const useStore = create<Store>()(
 
       setHasHydrated: (v) => set({ _hasHydrated: v }),
 
-      resetWardrobe: () =>
+      resetWardrobe: () => {
+        const s = get();
         set({
           ...PERSISTED_DEFAULTS,
           ...SESSION_DEFAULTS,
           _hasHydrated: true,
-          theme: get().theme, // keep the user's theme choice through a reset
-          browseMode: get().browseMode, // and their browse preference
-        }),
+          // keep the user's preferences through a wardrobe reset
+          theme: s.theme,
+          browseMode: s.browseMode,
+          logoVariant: s.logoVariant,
+          swipeHintSeen: s.swipeHintSeen,
+          notify: s.notify,
+        });
+      },
     }),
     {
       name: 'colorcloset',
@@ -309,6 +338,9 @@ export const useStore = create<Store>()(
         theme: s.theme,
         style: s.style,
         browseMode: s.browseMode,
+        logoVariant: s.logoVariant,
+        swipeHintSeen: s.swipeHintSeen,
+        notify: s.notify,
         setupComplete: s.setupComplete,
       }),
       // Always flip the flag once persistence settles — even if reading storage

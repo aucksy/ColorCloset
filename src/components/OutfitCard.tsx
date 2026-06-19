@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { LEATHER_HEX, catFor, leatherFor, shadeHex, skinObj, whyFor } from '@/engine';
+import { LEATHER_HEX, catFor, heritageFor, leatherFor, shadeHex, skinObj, whyFor } from '@/engine';
 import { GarmentSilhouette } from '@/components/GarmentSilhouette';
 import { Icon } from '@/components/Icon';
 import { useStore } from '@/store/useStore';
@@ -31,11 +31,14 @@ export function OutfitCard() {
   const wornDate = worn[id];
   const leather = leatherFor(botK);
   const leatherHex = LEATHER_HEX[leather];
+  const heritage = heritageFor(topK, botK);
 
   return (
     <View style={styles.wrap}>
       <Animated.View key={`hdr-${id}`} entering={FadeInDown.duration(motion.base)} style={styles.center}>
-        <Text style={[styles.cat, { color: t.accent, fontFamily: fonts.mono }]}>{catLabel}</Text>
+        <Text style={[styles.cat, { color: t.accent, fontFamily: fonts.mono }]}>
+          {heritage ? `${catLabel} · ${heritage.toUpperCase()}` : catLabel}
+        </Text>
         <Text style={[styles.name, { color: t.ink, fontFamily: fonts.display }]}>{name}</Text>
       </Animated.View>
 
@@ -62,6 +65,7 @@ export function OutfitCard() {
             <LeatherItem hex={leatherHex} ring={t.line2} label="Shoes" name={leather} t={t} />
           </View>
         </View>
+
 
         <View style={styles.pills}>
           {flatterHit && (
@@ -115,9 +119,9 @@ const styles = StyleSheet.create({
   lab: { marginTop: 11, fontSize: 12.5 },
   sub: { fontSize: 9, letterSpacing: 0.8 },
   plus: { fontSize: 22, alignSelf: 'center', marginBottom: 36 },
-  leather: { flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14, marginTop: 14, alignSelf: 'stretch' },
+  leather: { borderWidth: 1, borderRadius: 14, paddingVertical: 11, paddingHorizontal: 14, marginTop: 14, alignSelf: 'stretch', gap: 9 },
   leatherLab: { fontSize: 9, letterSpacing: 1.4 },
-  leatherItems: { flexDirection: 'row', gap: 16, flex: 1, justifyContent: 'flex-end' },
+  leatherItems: { flexDirection: 'row', gap: 22 },
   leatherItem: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   leatherSw: { width: 16, height: 16, borderRadius: 5, borderWidth: 1 },
   leatherTxt: { fontSize: 12 },

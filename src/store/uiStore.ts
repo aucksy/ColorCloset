@@ -4,7 +4,7 @@
  */
 import { create } from 'zustand';
 
-export type PanelId = 'skin' | 'about' | 'combos' | 'saved' | null;
+export type PanelId = 'skin' | 'about' | 'combos' | 'saved' | 'reminder' | null;
 
 interface UiState {
   drawerOpen: boolean;

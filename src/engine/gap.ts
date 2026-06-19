@@ -4,10 +4,13 @@
  * by new-look count with a bonus if it flatters the user. Pure port of renderShop
  * (prototype lines ~1022-1033).
  */
-import { KEYS } from './colors';
+import { KEYS, bottomScore } from './colors';
 import { GAP_THRESHOLD } from './constants';
 import { score } from './scoring';
 import type { BuySuggestion, ColorKey, SkinObj } from './types';
+
+/** A colour must be at least this plausible as trousers to be suggested as a bottom. */
+const MIN_BOTTOM_SUITABILITY = 0.35;
 
 export interface GapResult {
   /** Colours to add as tops (each pairs with existing bottoms). */
@@ -31,7 +34,8 @@ export function gapSuggestions(
   const asBottoms: BuySuggestion[] = [];
 
   KEYS.forEach((c) => {
-    if (!ownB.has(c)) {
+    // Only suggest a colour as a BOTTOM if it's a realistic trouser colour.
+    if (!ownB.has(c) && bottomScore(c) >= MIN_BOTTOM_SUITABILITY) {
       const pairs: ColorKey[] = [];
       tops.forEach((t) => {
         if (score(t, c, skin) >= GAP_THRESHOLD) pairs.push(t);
