@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { ScrollView, StyleSheet, Text, View, type LayoutChangeEvent, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { ScrollView, StyleSheet, Text, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { fonts } from '@/theme/fonts';
 import { useTheme } from '@/theme/useTheme';
 
@@ -19,14 +19,28 @@ function Column({ items, value, onChange, width }: ColumnProps) {
   const t = useTheme();
   const ref = useRef<ScrollView>(null);
   const didInit = useRef(false);
+  const lastIndex = useRef(value);
+  const offsetY = useRef(value * ITEM_H);
+  const dragTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Re-sync the physical scroll if the value changes from outside (not from our own settle).
+  useEffect(() => {
+    if (!didInit.current || value === lastIndex.current) return;
+    lastIndex.current = value;
+    ref.current?.scrollTo({ y: value * ITEM_H, animated: false });
+  }, [value]);
+
+  useEffect(() => () => { if (dragTimer.current) clearTimeout(dragTimer.current); }, []);
 
   const onLayout = (_e: LayoutChangeEvent) => {
     if (didInit.current) return;
     didInit.current = true;
+    lastIndex.current = value;
     ref.current?.scrollTo({ y: value * ITEM_H, animated: false });
   };
-  const settle = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const i = Math.max(0, Math.min(items.length - 1, Math.round(e.nativeEvent.contentOffset.y / ITEM_H)));
+  const commit = () => {
+    const i = Math.max(0, Math.min(items.length - 1, Math.round(offsetY.current / ITEM_H)));
+    lastIndex.current = i;
     if (i !== value) onChange(i);
   };
 
@@ -37,8 +51,20 @@ function Column({ items, value, onChange, width }: ColumnProps) {
         showsVerticalScrollIndicator={false}
         snapToInterval={ITEM_H}
         decelerationRate="fast"
+        scrollEventThrottle={16}
         contentContainerStyle={{ paddingVertical: PAD }}
-        onMomentumScrollEnd={settle}
+        onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+          offsetY.current = e.nativeEvent.contentOffset.y;
+        }}
+        onScrollEndDrag={() => {
+          // Settle even when the finger lifts with no momentum (no onMomentumScrollEnd).
+          if (dragTimer.current) clearTimeout(dragTimer.current);
+          dragTimer.current = setTimeout(commit, 180);
+        }}
+        onMomentumScrollBegin={() => {
+          if (dragTimer.current) clearTimeout(dragTimer.current);
+        }}
+        onMomentumScrollEnd={commit}
       >
         {items.map((it, i) => (
           <View key={i} style={styles.cell}>

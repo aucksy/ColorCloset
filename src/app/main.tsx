@@ -120,12 +120,13 @@ export default function Main() {
       prompted.current = true;
       Alert.alert('You’ve worn them all', `That’s all ${total} combinations. Reset your worn history to start a fresh round?`, [
         { text: 'Not now', style: 'cancel' },
-        { text: 'Reset worn', style: 'destructive', onPress: () => { clearWorn(); regenerate(); } },
+        { text: 'Reset worn', style: 'destructive', onPress: () => { setOnToday(false); clearWorn(); regenerate(); } },
       ]);
     }
     if (!allWorn) prompted.current = false;
   }, [wornCount, total, clearWorn, regenerate]);
 
+  const onStyle = (s: StyleName) => { setOnToday(false); setStyle(s); };
   const onNext = () => { setOnToday(false); next(); };
   const onPrev = () => { setOnToday(false); prev(); };
   const onWore = () => { setOnToday(false); markWorn(); showToast("Marked worn — here's a fresh one"); };
@@ -183,7 +184,7 @@ export default function Main() {
         {pane === 'rec' ? (
           <Animated.View key="rec" entering={FadeIn.duration(motion.fast)}>
             <Text style={[styles.chLabel, { color: t.faint, fontFamily: fonts.mono }]}>STYLE</Text>
-            <ChipRow items={STYLES.map((s) => ({ value: s as StyleName, label: s }))} value={style} onChange={setStyle} />
+            <ChipRow items={STYLES.map((s) => ({ value: s as StyleName, label: s }))} value={style} onChange={onStyle} />
 
             <View style={{ marginTop: 12 }}>
               {current ? (

@@ -26,6 +26,7 @@ export function BackupPanel() {
   };
   const onImport = () => {
     if (importData(paste.trim())) {
+      setPaste('');
       showToast('Wardrobe restored');
       closePanel();
     } else {

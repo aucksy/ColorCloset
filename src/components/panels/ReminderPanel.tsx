@@ -23,8 +23,10 @@ export function ReminderPanel() {
     const nextNotify = { ...notify, ...patch };
     setNotify(patch);
     syncReminders(nextNotify).then((ok) => {
-      if (nextNotify.enabled && !ok) {
-        setNotify({ enabled: false }); // permission wasn't granted — revert the toggle
+      // Only revert when this change was the act of *enabling* (a denied day/time
+      // edit while already enabled shouldn't flip the master toggle off).
+      if (patch.enabled === true && !ok) {
+        setNotify({ enabled: false });
         showToast('Allow notifications to get reminders');
       }
     });
@@ -38,7 +40,7 @@ export function ReminderPanel() {
 
   const test = () => {
     sendTestReminder().then((ok) =>
-      showToast(ok ? 'Test reminder coming in ~5s (vibrate only)' : 'Allow notifications first')
+      showToast(ok ? 'In ~5s it’ll vibrate & appear in your notifications' : 'Allow notifications first')
     );
   };
 

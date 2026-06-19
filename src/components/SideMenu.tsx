@@ -25,9 +25,13 @@ export function SideMenu() {
   const bottoms = useStore((s) => s.bottoms);
   const depth = useStore((s) => s.depth);
   const worn = useStore((s) => s.worn);
+  const dismissed = useStore((s) => s.dismissed);
   const resetWardrobe = useStore((s) => s.resetWardrobe);
 
-  const { total, worn: wornCount } = uniStats(tops, bottoms, skinObj(depth), worn);
+  // Match the rotation panel: exclude "not for me" combos from the count.
+  const active = uniStats(tops, bottoms, skinObj(depth), worn).uni.filter((c) => !dismissed[c.id]);
+  const total = active.length;
+  const wornCount = active.filter((c) => worn[c.id]).length;
 
   if (!open) return null;
 

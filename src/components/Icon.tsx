@@ -14,12 +14,10 @@ export type IconName =
   | 'grid'
   | 'menu'
   | 'pencil'
-  | 'bookmark'
   | 'heart'
   | 'heart-fill'
   | 'bell'
   | 'chevron-down'
-  | 'refresh'
   | 'star'
   | 'clock'
   | 'moon'
@@ -51,8 +49,6 @@ function paths(name: IconName, c: string, sw: number): ReactNode {
       return p('M4 7h16M4 12h16M4 17h16');
     case 'pencil':
       return p('M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z');
-    case 'bookmark':
-      return p('M5 4h14v16l-7-3.5L5 20z');
     case 'heart':
       return p('M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7z');
     case 'heart-fill':
@@ -61,8 +57,6 @@ function paths(name: IconName, c: string, sw: number): ReactNode {
       return p('M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0');
     case 'chevron-down':
       return p('M6 9l6 6 6-6');
-    case 'refresh':
-      return p('M21 12a9 9 0 1 1-3-6.7M21 4v5h-5');
     case 'star':
       return p('M12 3l2.6 6.3L21 10l-5 4 1.4 6.5L12 17l-5.4 3.5L8 14l-5-4 6.4-.7z');
     case 'clock':

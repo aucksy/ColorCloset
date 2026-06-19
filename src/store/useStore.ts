@@ -120,6 +120,26 @@ const PERSISTED_DEFAULTS: PersistedState = {
   setupComplete: false,
 };
 
+// Deterministic outfit name per combo, so revisiting a look never re-randomises it.
+const hashId = (s: string) => {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+};
+const seededName = (t: ColorKey, b: ColorKey, style: StyleName) => {
+  let seed = hashId(`${t}|${b}`);
+  const rng = () => {
+    seed = (seed + 0x6d2b79f5) >>> 0;
+    let x = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+  return nameFor(t, b, style, rng);
+};
+
 /** The browsable deck for the current state — excludes "not for me" combos. */
 const deckFor = (s: Store) =>
   buildDeck({ tops: s.tops, bottoms: s.bottoms, skin: skinObj(s.depth), style: s.style }).filter(
@@ -193,7 +213,7 @@ export const useStore = create<Store>()(
           set({ current: null, currentName: '', deckPos: -1 });
           return false;
         }
-        set({ current: { t: r.pick.t, b: r.pick.b }, currentName: nameFor(r.pick.t, r.pick.b, s.style), deckPos: r.pos });
+        set({ current: { t: r.pick.t, b: r.pick.b }, currentName: seededName(r.pick.t, r.pick.b, s.style), deckPos: r.pos });
         return r.roundDone;
       },
 
@@ -204,7 +224,7 @@ export const useStore = create<Store>()(
         if (!deck.length) return;
         const pos = (s.deckPos + 1) % deck.length;
         const pick = deck[pos];
-        set({ current: { t: pick.t, b: pick.b }, currentName: nameFor(pick.t, pick.b, s.style), deckPos: pos });
+        set({ current: { t: pick.t, b: pick.b }, currentName: seededName(pick.t, pick.b, s.style), deckPos: pos });
       },
       prev: () => {
         const s = get();
@@ -213,7 +233,7 @@ export const useStore = create<Store>()(
         const n = deck.length;
         const pos = (((s.deckPos === -1 ? 0 : s.deckPos) - 1) % n + n) % n;
         const pick = deck[pos];
-        set({ current: { t: pick.t, b: pick.b }, currentName: nameFor(pick.t, pick.b, s.style), deckPos: pos });
+        set({ current: { t: pick.t, b: pick.b }, currentName: seededName(pick.t, pick.b, s.style), deckPos: pos });
       },
       goToIndex: (i) => {
         const s = get();
@@ -221,7 +241,7 @@ export const useStore = create<Store>()(
         if (!deck.length) return;
         const pos = ((i % deck.length) + deck.length) % deck.length;
         const pick = deck[pos];
-        set({ current: { t: pick.t, b: pick.b }, currentName: nameFor(pick.t, pick.b, s.style), deckPos: pos });
+        set({ current: { t: pick.t, b: pick.b }, currentName: seededName(pick.t, pick.b, s.style), deckPos: pos });
       },
 
       markWorn: () => {
@@ -247,7 +267,7 @@ export const useStore = create<Store>()(
         }
         const pos = Math.min(s.deckPos < 0 ? 0 : s.deckPos, deck.length - 1);
         const pick = deck[pos];
-        set({ dismissed, current: { t: pick.t, b: pick.b }, currentName: nameFor(pick.t, pick.b, s.style), deckPos: pos });
+        set({ dismissed, current: { t: pick.t, b: pick.b }, currentName: seededName(pick.t, pick.b, s.style), deckPos: pos });
       },
       restoreDismissed: (id) => {
         const d = { ...get().dismissed };
@@ -258,7 +278,7 @@ export const useStore = create<Store>()(
       loadCombo: (t, b) => {
         const s = get();
         const pos = deckFor(s).findIndex((c) => c.t === t && c.b === b);
-        set({ current: { t, b }, currentName: nameFor(t, b, s.style), deckPos: pos });
+        set({ current: { t, b }, currentName: seededName(t, b, s.style), deckPos: pos });
       },
       setLastPickDay: (d) => set({ lastPickDay: d }),
 
@@ -279,7 +299,7 @@ export const useStore = create<Store>()(
           b,
           th: shadeHex(t, s.shadeTops[t]?.[0]),
           bh: shadeHex(b, s.shadeBottoms[b]?.[0]),
-          name: s.currentName || nameFor(t, b, s.style),
+          name: s.currentName || seededName(t, b, s.style),
           style: s.style,
           date: todayStr(),
         };
@@ -328,10 +348,15 @@ export const useStore = create<Store>()(
         try {
           const p = JSON.parse(json);
           if (!p || typeof p !== 'object' || !Array.isArray(p.tops) || !Array.isArray(p.bottoms)) return false;
+          // Only accept real palette colours — a garbage key would crash the engine.
+          const valid = (a: unknown[]): ColorKey[] => a.filter((k): k is ColorKey => KEYS.includes(k as ColorKey));
+          const tops = valid(p.tops);
+          const bottoms = valid(p.bottoms);
+          if (!tops.length || !bottoms.length) return false;
           set({
             depth: p.depth ?? null,
-            tops: p.tops,
-            bottoms: p.bottoms,
+            tops,
+            bottoms,
             shadeTops: p.shadeTops ?? {},
             shadeBottoms: p.shadeBottoms ?? {},
             worn: p.worn ?? {},
