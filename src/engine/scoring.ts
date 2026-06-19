@@ -24,9 +24,10 @@ export function harmony(t: ColorKey, b: ColorKey): number {
     if ((WARM.has(t) && COOL.has(b)) || (COOL.has(t) && WARM.has(b))) s -= 0.14;
   }
   // Flatness penalties: the same colour top+bottom (Beige+Beige) reads dead; two
-  // colours of the same family at near-equal value (Burgundy+Maroon, Beige+Khaki) too.
+  // colours of the same family at near-equal value (Burgundy+Maroon) too — but never
+  // penalise a curated exemplar (e.g. Beige+Khaki Minimal) as flat.
   if (t === b) s -= 0.22;
-  else if (FAMILY[t] === FAMILY[b] && dl < 0.14) s -= 0.12;
+  else if (!knownGood && FAMILY[t] === FAMILY[b] && dl < 0.14) s -= 0.12;
   return Math.max(0, Math.min(1, s));
 }
 

@@ -16,22 +16,25 @@ async function ensurePermission(): Promise<boolean> {
   return req.granted;
 }
 
-/** Cancel and (re)build the reminder schedule from the current settings. */
-export async function syncReminders(notify: NotifySettings): Promise<boolean> {
+async function doSync(notify: NotifySettings): Promise<boolean> {
   try {
-    await Notifications.cancelAllScheduledNotificationsAsync();
-    if (!notify.enabled || notify.days.length === 0) return true;
-
+    // Disabling (or no days): just clear the schedule.
+    if (!notify.enabled || notify.days.length === 0) {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      return true;
+    }
+    // Enabling: confirm permission BEFORE wiping the existing schedule, so a denial
+    // never silently kills working reminders.
     const ok = await ensurePermission();
     if (!ok) return false;
 
+    await Notifications.cancelAllScheduledNotificationsAsync();
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync(CHANNEL, {
         name: 'Daily outfit',
         importance: Notifications.AndroidImportance.DEFAULT,
       });
     }
-
     for (const weekday of notify.days) {
       await Notifications.scheduleNotificationAsync({
         content: {
@@ -51,4 +54,15 @@ export async function syncReminders(notify: NotifySettings): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// Serialize re-syncs so rapid setting changes can't interleave cancel/schedule calls
+// (which would leave the OS schedule out of sync with the final settings).
+let chain: Promise<boolean> = Promise.resolve(true);
+
+/** Cancel and (re)build the reminder schedule from the current settings. */
+export function syncReminders(notify: NotifySettings): Promise<boolean> {
+  const run = () => doSync(notify);
+  chain = chain.then(run, run);
+  return chain;
 }

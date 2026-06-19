@@ -28,7 +28,10 @@ export function ReminderPanel() {
     const nextNotify = { ...notify, ...patch };
     setNotify(patch);
     syncReminders(nextNotify).then((ok) => {
-      if (nextNotify.enabled && !ok) showToast('Allow notifications to get reminders');
+      if (nextNotify.enabled && !ok) {
+        setNotify({ enabled: false }); // revert the toggle — permission wasn't granted
+        showToast('Allow notifications to get reminders');
+      }
     });
   };
 

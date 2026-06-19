@@ -23,7 +23,7 @@ interface Props {
   total: number;
   onNext: () => void; // swipe left
   onPrev: () => void; // swipe right
-  onSave: () => void; // double-tap
+  onSave: () => boolean; // double-tap; returns true if it actually saved (else already saved)
 }
 
 /**
@@ -99,16 +99,19 @@ export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
       }
     });
 
+  // Save on the JS thread so the heart burst only plays when a save actually happened
+  // (not when the look was already saved).
+  const onDoubleTap = () => {
+    if (onSave()) {
+      hapticSuccess();
+      heart.value = withSequence(withTiming(1, { duration: 150 }), withDelay(280, withTiming(0, { duration: 220 })));
+    }
+  };
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .maxDuration(280)
     .onEnd(() => {
-      runOnJS(hapticSuccess)();
-      runOnJS(onSave)();
-      heart.value = withSequence(
-        withTiming(1, { duration: 150 }),
-        withDelay(280, withTiming(0, { duration: 220 }))
-      );
+      runOnJS(onDoubleTap)();
     });
 
   const gesture = Gesture.Race(doubleTap, pan);

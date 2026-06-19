@@ -116,13 +116,14 @@ export default function Main() {
     markWorn();
     showToast("Marked worn — here's a fresh one");
   };
-  const onSave = () => {
+  const onSave = (): boolean => {
     if (isSaved) {
       showToast('Already in your looks');
-      return;
+      return false;
     }
     saveCurrent();
     showToast('Saved to your looks');
+    return true;
   };
 
   return (
