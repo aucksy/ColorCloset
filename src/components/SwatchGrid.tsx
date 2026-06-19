@@ -59,7 +59,13 @@ export function SwatchGrid({ slot }: Props) {
                         style={({ pressed }) => [styles.chipHit, { transform: [{ scale: pressed ? 0.9 : 1 }] }]}
                         hitSlop={4}
                       >
-                        <View style={[styles.chip, { backgroundColor: sh }, active && { borderColor: '#fff', borderWidth: 2.5 }]} />
+                        <View
+                          style={[
+                            styles.chip,
+                            { backgroundColor: sh, borderColor: t.line2 },
+                            active && { borderColor: t.accent, borderWidth: 2.6 },
+                          ]}
+                        />
                       </Pressable>
                     );
                   })}
@@ -91,6 +97,6 @@ const styles = StyleSheet.create({
   },
   strip: { flexDirection: 'row', gap: 4, padding: 6 },
   chipHit: { flex: 1, alignItems: 'stretch' },
-  chip: { height: 38, borderRadius: 7, borderColor: 'rgba(255,255,255,0.2)', borderWidth: 1 },
+  chip: { height: 38, borderRadius: 7, borderWidth: 1 },
   name: { fontSize: 12, textAlign: 'center', paddingVertical: 9, paddingHorizontal: 4 },
 });

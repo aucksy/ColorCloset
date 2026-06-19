@@ -9,6 +9,8 @@ export type IconName =
   | 'chevron-left'
   | 'chevron-right'
   | 'check'
+  | 'x'
+  | 'download'
   | 'grid'
   | 'menu'
   | 'pencil'
@@ -39,6 +41,10 @@ function paths(name: IconName, c: string, sw: number): ReactNode {
       return p('M9 6l6 6-6 6');
     case 'check':
       return p('M5 12l5 5 9-10');
+    case 'x':
+      return p('M6 6l12 12M18 6L6 18');
+    case 'download':
+      return p('M12 3v12M8 11l4 4 4-4M5 21h14');
     case 'grid':
       return p('M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z');
     case 'menu':

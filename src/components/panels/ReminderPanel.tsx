@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Button } from '@/components/Button';
 import { PanelShell } from '@/components/PanelShell';
-import { syncReminders } from '@/lib/notify';
+import { WheelTimePicker } from '@/components/WheelTimePicker';
+import { sendTestReminder, syncReminders } from '@/lib/notify';
 import { useStore } from '@/store/useStore';
 import { useUiStore } from '@/store/uiStore';
 import { fonts } from '@/theme/fonts';
@@ -9,13 +11,7 @@ import { useTheme } from '@/theme/useTheme';
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']; // index 0..6 = Sun..Sat
 const toWeekday = (i: number) => i + 1; // expo: 1 = Sunday .. 7 = Saturday
 
-function fmt(h: number, m: number) {
-  const ap = h < 12 ? 'AM' : 'PM';
-  const hh = h % 12 === 0 ? 12 : h % 12;
-  return `${hh}:${String(m).padStart(2, '0')} ${ap}`;
-}
-
-/** Daily outfit-reminder settings (local notifications). */
+/** Daily outfit-reminder settings (local, vibrate-only notifications). */
 export function ReminderPanel() {
   const t = useTheme();
   const closePanel = useUiStore((s) => s.closePanel);
@@ -23,13 +19,12 @@ export function ReminderPanel() {
   const notify = useStore((s) => s.notify);
   const setNotify = useStore((s) => s.setNotify);
 
-  // Apply a settings change and re-sync the OS schedule.
   const apply = (patch: Partial<typeof notify>) => {
     const nextNotify = { ...notify, ...patch };
     setNotify(patch);
     syncReminders(nextNotify).then((ok) => {
       if (nextNotify.enabled && !ok) {
-        setNotify({ enabled: false }); // revert the toggle — permission wasn't granted
+        setNotify({ enabled: false }); // permission wasn't granted — revert the toggle
         showToast('Allow notifications to get reminders');
       }
     });
@@ -40,14 +35,18 @@ export function ReminderPanel() {
     const days = notify.days.includes(wd) ? notify.days.filter((d) => d !== wd) : [...notify.days, wd].sort((a, b) => a - b);
     apply({ days });
   };
-  const bumpHour = (d: number) => apply({ hour: (notify.hour + d + 24) % 24 });
-  const bumpMin = (d: number) => apply({ minute: (notify.minute + d + 60) % 60 });
+
+  const test = () => {
+    sendTestReminder().then((ok) =>
+      showToast(ok ? 'Test reminder coming in ~5s (vibrate only)' : 'Allow notifications first')
+    );
+  };
 
   return (
     <PanelShell title="Daily reminder" onClose={closePanel}>
       <Text style={[styles.p, { color: t.muted, fontFamily: fonts.uiRegular }]}>
-        A gentle nudge — “Today’s outfit recommendation” — at a time you choose. Everything runs on your
-        device; nothing leaves your phone.
+        A gentle nudge — “Today’s outfit recommendation” — at a time you choose. It vibrates only, never
+        makes a sound, and everything runs on your device.
       </Text>
 
       <Pressable onPress={() => apply({ enabled: !notify.enabled })} style={[styles.toggle, { backgroundColor: t.glass, borderColor: t.line }]}>
@@ -58,11 +57,7 @@ export function ReminderPanel() {
       </Pressable>
 
       <Text style={[styles.label, { color: t.faint, fontFamily: fonts.mono }]}>TIME</Text>
-      <View style={[styles.timeRow, { backgroundColor: t.glass, borderColor: t.line }]}>
-        <Stepper t={t} onDown={() => bumpHour(-1)} onUp={() => bumpHour(1)} />
-        <Text style={[styles.time, { color: t.ink, fontFamily: fonts.displaySemi }]}>{fmt(notify.hour, notify.minute)}</Text>
-        <Stepper t={t} onDown={() => bumpMin(-15)} onUp={() => bumpMin(15)} label="min" />
-      </View>
+      <WheelTimePicker hour={notify.hour} minute={notify.minute} onChange={(h, m) => apply({ hour: h, minute: m })} />
 
       <Text style={[styles.label, { color: t.faint, fontFamily: fonts.mono }]}>DAYS</Text>
       <View style={styles.days}>
@@ -75,21 +70,14 @@ export function ReminderPanel() {
           );
         })}
       </View>
-    </PanelShell>
-  );
-}
 
-function Stepper({ t, onDown, onUp, label }: { t: ReturnType<typeof useTheme>; onDown: () => void; onUp: () => void; label?: string }) {
-  return (
-    <View style={styles.stepper}>
-      <Pressable onPress={onDown} style={[styles.stepBtn, { borderColor: t.line2 }]}>
-        <Text style={[styles.stepGlyph, { color: t.ink }]}>−</Text>
-      </Pressable>
-      {label && <Text style={[styles.stepLabel, { color: t.faint, fontFamily: fonts.mono }]}>{label}</Text>}
-      <Pressable onPress={onUp} style={[styles.stepBtn, { borderColor: t.line2 }]}>
-        <Text style={[styles.stepGlyph, { color: t.ink }]}>＋</Text>
-      </Pressable>
-    </View>
+      <View style={styles.testBtn}>
+        <Button title="Send a test now" variant="goldline" onPress={test} />
+      </View>
+      <Text style={[styles.hint, { color: t.faint, fontFamily: fonts.uiRegular }]}>
+        Reminders repeat weekly on the chosen days. If a test doesn’t arrive, enable notifications for ColorCloset in your phone’s settings.
+      </Text>
+    </PanelShell>
   );
 }
 
@@ -100,13 +88,9 @@ const styles = StyleSheet.create({
   switch: { width: 42, height: 24, borderRadius: 99, justifyContent: 'center' },
   knob: { position: 'absolute', top: 3, width: 18, height: 18, borderRadius: 9, backgroundColor: '#fff' },
   label: { fontSize: 10, letterSpacing: 1.6, marginTop: 24, marginBottom: 10 },
-  timeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 16 },
-  time: { fontSize: 26 },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  stepBtn: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  stepGlyph: { fontSize: 20, lineHeight: 22 },
-  stepLabel: { fontSize: 9 },
   days: { flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   day: { flex: 1, aspectRatio: 1, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   dayTxt: { fontSize: 14 },
+  testBtn: { marginTop: 26 },
+  hint: { fontSize: 11.5, lineHeight: 17, marginTop: 12 },
 });

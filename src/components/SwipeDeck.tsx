@@ -68,7 +68,7 @@ export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
       mounted.current = true;
       return;
     }
-    tx.value = withTiming(0, { duration: 180 });
+    tx.value = withTiming(0, { duration: 230 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pos]);
 
@@ -86,13 +86,21 @@ export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
       const goPrev = e.translationX >= THRESH || e.velocityX >= FLICK;
       if (goNext) {
         runOnJS(hapticLight)();
+        // Old card flies LEFT, then we park the incoming card off-screen RIGHT so it
+        // slides in from the opposite side (natural carousel direction).
         tx.value = withTiming(-OFF, { duration: 180 }, (fin) => {
-          if (fin) runOnJS(onNext)();
+          if (fin) {
+            tx.value = OFF;
+            runOnJS(onNext)();
+          }
         });
       } else if (goPrev) {
         runOnJS(hapticLight)();
         tx.value = withTiming(OFF, { duration: 180 }, (fin) => {
-          if (fin) runOnJS(onPrev)();
+          if (fin) {
+            tx.value = -OFF;
+            runOnJS(onPrev)();
+          }
         });
       } else {
         tx.value = withSpring(0, { damping: 18, stiffness: 180 });
@@ -148,10 +156,11 @@ export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
 }
 
 const styles = StyleSheet.create({
-  stage: { position: 'relative', marginTop: 4 },
+  stage: { position: 'relative', marginTop: 4, marginBottom: 30 },
   card: { borderRadius: 24, borderWidth: 1, paddingTop: 14, paddingHorizontal: 12, paddingBottom: 18, overflow: 'hidden' },
+  // Ghost cards peek below the active card so it clearly reads as a swipeable deck.
   ghost: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 24, borderWidth: 1 },
-  ghost1: { transform: [{ translateY: 9 }, { scaleX: 0.955 }], opacity: 0.7 },
-  ghost2: { transform: [{ translateY: 18 }, { scaleX: 0.91 }], opacity: 0.4 },
+  ghost1: { transform: [{ translateY: 15 }, { scaleX: 0.95 }], opacity: 0.85 },
+  ghost2: { transform: [{ translateY: 29 }, { scaleX: 0.89 }], opacity: 0.5 },
   heart: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
 });

@@ -5,12 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { uniStats, skinObj } from '@/engine';
 import { Icon, type IconName } from '@/components/Icon';
 import { Logo } from '@/components/Logo';
-import { useStore, type LogoVariant } from '@/store/useStore';
+import { useStore } from '@/store/useStore';
 import { useUiStore } from '@/store/uiStore';
 import { fonts } from '@/theme/fonts';
 import { useTheme } from '@/theme/useTheme';
-
-const LOGO_OPTIONS: LogoVariant[] = ['armoire', 'ring', 'wheel', 'medallion', 'hanger'];
 
 export function SideMenu() {
   const t = useTheme();
@@ -22,10 +20,6 @@ export function SideMenu() {
 
   const theme = useStore((s) => s.theme);
   const toggleTheme = useStore((s) => s.toggleTheme);
-  const browseMode = useStore((s) => s.browseMode);
-  const toggleBrowseMode = useStore((s) => s.toggleBrowseMode);
-  const logoVariant = useStore((s) => s.logoVariant);
-  const setLogoVariant = useStore((s) => s.setLogoVariant);
   const saved = useStore((s) => s.saved.length);
   const tops = useStore((s) => s.tops);
   const bottoms = useStore((s) => s.bottoms);
@@ -66,8 +60,8 @@ export function SideMenu() {
         <Pressable style={[StyleSheet.absoluteFill, styles.scrim]} onPress={closeDrawer} />
       </Animated.View>
       <Animated.View
-        entering={SlideInLeft.duration(320)}
-        exiting={SlideOutLeft.duration(280)}
+        entering={SlideInLeft.springify().damping(17).stiffness(150).mass(0.7)}
+        exiting={SlideOutLeft.duration(240)}
         style={[styles.sheet, { backgroundColor: t.surface, borderRightColor: t.line, paddingTop: insets.top + 22, paddingBottom: insets.bottom + 4 }]}
       >
         <View style={styles.brand}>
@@ -77,38 +71,17 @@ export function SideMenu() {
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 12 }}>
           <Item t={t} icon="grid" label="Add more colours" onPress={addColours} />
-          <Item t={t} icon="list" label="My combinations" onPress={() => openPanel('combos')} right={`${wornCount}/${total}`} />
+          <Item t={t} icon="list" label="Your rotation" onPress={() => openPanel('combos')} right={`${wornCount}/${total}`} />
           <Item t={t} icon="heart" label="Saved looks" onPress={() => openPanel('saved')} right={String(saved)} />
           <Item t={t} icon="bell" label="Daily reminder" onPress={() => openPanel('reminder')} />
 
-          <Toggle t={t} icon="refresh" label="Swipe cards" on={browseMode === 'swipe'} onPress={toggleBrowseMode} />
           <Toggle t={t} icon={theme === 'dark' ? 'moon' : 'sun'} label={theme === 'dark' ? 'Dark mode' : 'Light mode'} on={theme === 'light'} onPress={toggleTheme} />
-
-          <View style={[styles.div, { backgroundColor: t.line }]} />
-
-          {/* brand-mark picker — test the premium icon options */}
-          <Text style={[styles.pickLabel, { color: t.faint, fontFamily: fonts.mono }]}>BRAND MARK</Text>
-          <View style={styles.logoRow}>
-            {LOGO_OPTIONS.map((v) => {
-              const on = logoVariant === v;
-              return (
-                <Pressable
-                  key={v}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: on }}
-                  onPress={() => setLogoVariant(v)}
-                  style={[styles.logoOpt, { borderColor: on ? t.accent : t.line, backgroundColor: on ? t.glass2 : t.glass }]}
-                >
-                  <Logo variant={v} size={34} />
-                </Pressable>
-              );
-            })}
-          </View>
 
           <View style={[styles.div, { backgroundColor: t.line }]} />
 
           <Item t={t} icon="pencil" label="Skin tone" onPress={() => openPanel('skin')} />
           <Item t={t} icon="setup" label="Set up again" onPress={setupAgain} />
+          <Item t={t} icon="download" label="Backup & restore" onPress={() => openPanel('backup')} />
           <Item t={t} icon="info" label="How it works" onPress={() => openPanel('about')} />
           <Item t={t} icon="reset" label="Reset wardrobe" onPress={reset} />
 
@@ -189,8 +162,5 @@ const styles = StyleSheet.create({
   switch: { marginLeft: 'auto', width: 42, height: 24, borderRadius: 99, justifyContent: 'center' },
   knob: { position: 'absolute', top: 3, width: 18, height: 18, borderRadius: 9, backgroundColor: '#fff' },
   div: { height: 1, marginVertical: 10, marginHorizontal: 6 },
-  pickLabel: { fontSize: 9, letterSpacing: 1.6, paddingHorizontal: 12, marginBottom: 10 },
-  logoRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 10 },
-  logoOpt: { flex: 1, aspectRatio: 1, borderRadius: 13, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   foot: { paddingHorizontal: 8, paddingVertical: 16, fontSize: 11, lineHeight: 17 },
 });

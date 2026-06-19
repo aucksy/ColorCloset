@@ -1,9 +1,7 @@
 /**
  * The single app store (Zustand + persist). The session slice (deck position /
- * current pairing) is transient and partialized out of persistence.
- *
- * The "Another" deck walk lives here as actions so every surface (card, save,
- * mark-worn, swipe deck, style chips) drives one consistent walk.
+ * current pairing) is transient and partialized out of persistence. Browsing is
+ * swipe-only; the deck excludes any combos the user marked "not for me".
  */
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
@@ -21,12 +19,6 @@ import {
 } from '@/engine';
 import { todayStr } from '@/lib/date';
 import { activeStorage } from './storage';
-
-/** How the user browses the deck: the classic "Another" button or a swipe deck. */
-export type BrowseMode = 'classic' | 'swipe';
-
-/** Selectable in-app brand mark (tested from the sidebar). */
-export type LogoVariant = 'armoire' | 'ring' | 'wheel' | 'hanger' | 'medallion';
 
 /** Daily outfit-reminder settings. days = weekday numbers 1=Sun .. 7=Sat (expo). */
 export interface NotifySettings {
@@ -53,17 +45,16 @@ interface PersistedState {
   depth: DepthId | null;
   tops: ColorKey[];
   bottoms: ColorKey[];
-  // Each owned colour can hold several shades (light->dark) the user actually owns.
   shadeTops: Record<ColorKey, ShadeIndex[]>;
   shadeBottoms: Record<ColorKey, ShadeIndex[]>;
   worn: Record<string, string>;
+  dismissed: Record<string, boolean>; // combos the user marked "not for me"
   saved: SavedLook[];
   theme: 'dark' | 'light';
   style: StyleName;
-  browseMode: BrowseMode;
-  logoVariant: LogoVariant;
   swipeHintSeen: boolean;
   notify: NotifySettings;
+  lastPickDay: string; // yyyy-mm-dd the "today's pick" was last seeded
   setupComplete: boolean;
 }
 
@@ -75,9 +66,7 @@ interface SessionState {
 }
 
 interface Actions {
-  // profile
   setDepth: (d: DepthId) => void;
-  // wardrobe
   toggleColor: (slot: Slot, key: ColorKey) => void;
   setColors: (slot: Slot, colors: ColorKey[]) => void;
   toggleShade: (slot: Slot, key: ColorKey, idx: ShadeIndex) => void;
@@ -86,35 +75,33 @@ interface Actions {
   another: () => boolean;
   next: () => void;
   prev: () => void;
+  goToIndex: (i: number) => void;
   markWorn: () => void;
+  dismiss: () => void;
+  restoreDismissed: (id: string) => void;
   loadCombo: (t: ColorKey, b: ColorKey) => void;
+  setLastPickDay: (d: string) => void;
   // controls
   setStyle: (s: StyleName) => void;
-  setBrowseMode: (m: BrowseMode) => void;
-  toggleBrowseMode: () => void;
-  setLogoVariant: (v: LogoVariant) => void;
   markSwipeHintSeen: () => void;
   setNotify: (patch: Partial<NotifySettings>) => void;
   // saved / worn
   saveCurrent: () => void;
   deleteSaved: (id: number) => void;
   clearWorn: () => void;
-  // settings
+  // settings / data
   setTheme: (t: 'dark' | 'light') => void;
   toggleTheme: () => void;
   completeSetup: () => void;
   resetWardrobe: () => void;
   setHasHydrated: (v: boolean) => void;
+  exportData: () => string;
+  importData: (json: string) => boolean;
 }
 
 export type Store = PersistedState & SessionState & Actions;
 
-const SESSION_DEFAULTS: SessionState = {
-  current: null,
-  currentName: '',
-  deckPos: -1,
-  _hasHydrated: false,
-};
+const SESSION_DEFAULTS: SessionState = { current: null, currentName: '', deckPos: -1, _hasHydrated: false };
 
 const PERSISTED_DEFAULTS: PersistedState = {
   depth: null,
@@ -123,18 +110,21 @@ const PERSISTED_DEFAULTS: PersistedState = {
   shadeTops: {},
   shadeBottoms: {},
   worn: {},
+  dismissed: {},
   saved: [],
   theme: 'dark',
   style: 'Minimal',
-  browseMode: 'classic',
-  logoVariant: 'armoire',
   swipeHintSeen: false,
-  notify: { enabled: false, hour: 8, minute: 0, days: [1, 2, 3, 4, 5, 6, 7] },
+  notify: { enabled: false, hour: 9, minute: 0, days: [1, 2, 3, 4, 5, 6, 7] },
+  lastPickDay: '',
   setupComplete: false,
 };
 
+/** The browsable deck for the current state — excludes "not for me" combos. */
 const deckFor = (s: Store) =>
-  buildDeck({ tops: s.tops, bottoms: s.bottoms, skin: skinObj(s.depth), style: s.style });
+  buildDeck({ tops: s.tops, bottoms: s.bottoms, skin: skinObj(s.depth), style: s.style }).filter(
+    (c) => !s.dismissed[c.id]
+  );
 
 export const useStore = create<Store>()(
   persist(
@@ -154,7 +144,7 @@ export const useStore = create<Store>()(
         const adding = !setK.has(key);
         if (adding) setK.add(key);
         else setK.delete(key);
-        const next = KEYS.filter((k) => setK.has(k)); // keep canonical order
+        const next = KEYS.filter((k) => setK.has(k));
         const shadeField = slot === 'tops' ? 'shadeTops' : 'shadeBottoms';
         const shades = { ...s[shadeField] };
         if (adding && shades[key] == null) shades[key] = [2];
@@ -164,7 +154,7 @@ export const useStore = create<Store>()(
       setColors: (slot, colors) => {
         const s = get();
         const setK = new Set(colors);
-        const next = KEYS.filter((k) => setK.has(k)); // canonical order
+        const next = KEYS.filter((k) => setK.has(k));
         const shadeField = slot === 'tops' ? 'shadeTops' : 'shadeBottoms';
         const shades = { ...s[shadeField] };
         next.forEach((k) => {
@@ -180,18 +170,12 @@ export const useStore = create<Store>()(
         const owned = arr.includes(key);
         const cur = s[shadeField][key] ?? [];
         let nextShades: ShadeIndex[];
-        if (!owned) {
-          // First touch: select the colour with just this shade.
-          nextShades = [idx];
-        } else if (cur.includes(idx)) {
-          // Toggling off — but never leave a selected colour with zero shades.
+        if (!owned) nextShades = [idx];
+        else if (cur.includes(idx)) {
           nextShades = cur.filter((i) => i !== idx);
           if (nextShades.length === 0) nextShades = [idx];
-        } else {
-          nextShades = [...cur, idx].sort((a, b) => a - b) as ShadeIndex[];
-        }
+        } else nextShades = [...cur, idx].sort((a, b) => a - b) as ShadeIndex[];
         const shades = { ...s[shadeField], [key]: nextShades };
-        // Tapping a shade also selects the colour (prototype behaviour).
         const next = owned ? arr : KEYS.filter((k) => arr.includes(k) || k === key);
         set({ [shadeField]: shades, [slot]: next } as Partial<Store>);
       },
@@ -209,22 +193,16 @@ export const useStore = create<Store>()(
           set({ current: null, currentName: '', deckPos: -1 });
           return false;
         }
-        set({
-          current: { t: r.pick.t, b: r.pick.b },
-          currentName: nameFor(r.pick.t, r.pick.b, s.style),
-          deckPos: r.pos,
-        });
+        set({ current: { t: r.pick.t, b: r.pick.b }, currentName: nameFor(r.pick.t, r.pick.b, s.style), deckPos: r.pos });
         return r.roundDone;
       },
 
-      // Linear step through the deck for swipe browsing — walks EVERY look in order
-      // (does not skip worn, so the "x of N" counter stays continuous).
+      // Linear swipe steps — walk every look in order (continuous "x of N" counter).
       next: () => {
         const s = get();
         const deck = deckFor(s);
         if (!deck.length) return;
-        const n = deck.length;
-        const pos = (s.deckPos + 1) % n; // deckPos -1 -> 0 on first step
+        const pos = (s.deckPos + 1) % deck.length;
         const pick = deck[pos];
         set({ current: { t: pick.t, b: pick.b }, currentName: nameFor(pick.t, pick.b, s.style), deckPos: pos });
       },
@@ -237,32 +215,57 @@ export const useStore = create<Store>()(
         const pick = deck[pos];
         set({ current: { t: pick.t, b: pick.b }, currentName: nameFor(pick.t, pick.b, s.style), deckPos: pos });
       },
+      goToIndex: (i) => {
+        const s = get();
+        const deck = deckFor(s);
+        if (!deck.length) return;
+        const pos = ((i % deck.length) + deck.length) % deck.length;
+        const pick = deck[pos];
+        set({ current: { t: pick.t, b: pick.b }, currentName: nameFor(pick.t, pick.b, s.style), deckPos: pos });
+      },
 
       markWorn: () => {
         const s = get();
         if (!s.current) return;
         const id = s.current.t + '|' + s.current.b;
         set({ worn: { ...s.worn, [id]: todayStr() } });
-        // Advance the way the user is browsing: linear in swipe, worn-skip in classic.
-        if (get().browseMode === 'swipe') get().next();
-        else get().another();
+        get().next();
+      },
+
+      dismiss: () => {
+        const s = get();
+        if (!s.current) return;
+        const id = s.current.t + '|' + s.current.b;
+        const dismissed = { ...s.dismissed, [id]: true };
+        // Rebuild the deck without this combo; the same index now points to the next one.
+        const deck = buildDeck({ tops: s.tops, bottoms: s.bottoms, skin: skinObj(s.depth), style: s.style }).filter(
+          (c) => !dismissed[c.id]
+        );
+        if (!deck.length) {
+          set({ dismissed, current: null, currentName: '', deckPos: -1 });
+          return;
+        }
+        const pos = Math.min(s.deckPos < 0 ? 0 : s.deckPos, deck.length - 1);
+        const pick = deck[pos];
+        set({ dismissed, current: { t: pick.t, b: pick.b }, currentName: nameFor(pick.t, pick.b, s.style), deckPos: pos });
+      },
+      restoreDismissed: (id) => {
+        const d = { ...get().dismissed };
+        delete d[id];
+        set({ dismissed: d });
       },
 
       loadCombo: (t, b) => {
         const s = get();
-        // Sync deckPos to the loaded combo so the next walk/swipe continues from here
-        // and the swipe "x of N" counter stays correct.
         const pos = deckFor(s).findIndex((c) => c.t === t && c.b === b);
         set({ current: { t, b }, currentName: nameFor(t, b, s.style), deckPos: pos });
       },
+      setLastPickDay: (d) => set({ lastPickDay: d }),
 
       setStyle: (st) => {
         set({ style: st });
         get().regenerate();
       },
-      setBrowseMode: (m) => set({ browseMode: m }),
-      toggleBrowseMode: () => set({ browseMode: get().browseMode === 'swipe' ? 'classic' : 'swipe' }),
-      setLogoVariant: (v) => set({ logoVariant: v }),
       markSwipeHintSeen: () => set({ swipeHintSeen: true }),
       setNotify: (patch) => set({ notify: { ...get().notify, ...patch } }),
 
@@ -287,9 +290,7 @@ export const useStore = create<Store>()(
 
       setTheme: (t) => set({ theme: t }),
       toggleTheme: () => set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
-
       completeSetup: () => set({ setupComplete: true }),
-
       setHasHydrated: (v) => set({ _hasHydrated: v }),
 
       resetWardrobe: () => {
@@ -298,21 +299,62 @@ export const useStore = create<Store>()(
           ...PERSISTED_DEFAULTS,
           ...SESSION_DEFAULTS,
           _hasHydrated: true,
-          // keep the user's preferences through a wardrobe reset
-          theme: s.theme,
-          browseMode: s.browseMode,
-          logoVariant: s.logoVariant,
+          theme: s.theme, // keep preferences through a wardrobe reset
           swipeHintSeen: s.swipeHintSeen,
           notify: s.notify,
         });
       },
+
+      exportData: () => {
+        const s = get();
+        return JSON.stringify({
+          app: 'colorcloset',
+          v: 4,
+          depth: s.depth,
+          tops: s.tops,
+          bottoms: s.bottoms,
+          shadeTops: s.shadeTops,
+          shadeBottoms: s.shadeBottoms,
+          worn: s.worn,
+          dismissed: s.dismissed,
+          saved: s.saved,
+          theme: s.theme,
+          style: s.style,
+          notify: s.notify,
+          setupComplete: s.setupComplete,
+        });
+      },
+      importData: (json) => {
+        try {
+          const p = JSON.parse(json);
+          if (!p || typeof p !== 'object' || !Array.isArray(p.tops) || !Array.isArray(p.bottoms)) return false;
+          set({
+            depth: p.depth ?? null,
+            tops: p.tops,
+            bottoms: p.bottoms,
+            shadeTops: p.shadeTops ?? {},
+            shadeBottoms: p.shadeBottoms ?? {},
+            worn: p.worn ?? {},
+            dismissed: p.dismissed ?? {},
+            saved: Array.isArray(p.saved) ? p.saved : [],
+            theme: p.theme === 'light' ? 'light' : 'dark',
+            style: p.style ?? 'Minimal',
+            notify: p.notify ?? PERSISTED_DEFAULTS.notify,
+            setupComplete: !!p.setupComplete,
+            ...SESSION_DEFAULTS,
+            _hasHydrated: true,
+          });
+          get().regenerate();
+          return true;
+        } catch {
+          return false;
+        }
+      },
     }),
     {
       name: 'colorcloset',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => activeStorage),
-      // v1 stored one shade per colour (a number); v2+ stores an array of shades.
-      // v3 dropped the type-tagging + occasion fields (ignored on load automatically).
       migrate: (persisted: any, version) => {
         if (persisted && version < 2) {
           const toArr = (m: Record<string, unknown> | undefined) => {
@@ -334,17 +376,15 @@ export const useStore = create<Store>()(
         shadeTops: s.shadeTops,
         shadeBottoms: s.shadeBottoms,
         worn: s.worn,
+        dismissed: s.dismissed,
         saved: s.saved,
         theme: s.theme,
         style: s.style,
-        browseMode: s.browseMode,
-        logoVariant: s.logoVariant,
         swipeHintSeen: s.swipeHintSeen,
         notify: s.notify,
+        lastPickDay: s.lastPickDay,
         setupComplete: s.setupComplete,
       }),
-      // Always flip the flag once persistence settles — even if reading storage
-      // failed — so the app never hangs on the splash screen.
       onRehydrateStorage: () => () => {
         useStore.setState({ _hasHydrated: true });
       },

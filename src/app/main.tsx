@@ -1,14 +1,13 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { STYLES, skinObj, uniStats, type StyleName } from '@/engine';
+import { STYLES, buildDeck, skinObj, type StyleName } from '@/engine';
 import { Button } from '@/components/Button';
 import { ChipRow } from '@/components/ChipRow';
 import { Icon } from '@/components/Icon';
 import { Logo } from '@/components/Logo';
-import { OutfitCard } from '@/components/OutfitCard';
 import { ProgressBar } from '@/components/ProgressBar';
 import { Segmented, type Pane } from '@/components/Segmented';
 import { SideMenu } from '@/components/SideMenu';
@@ -16,6 +15,7 @@ import { SwipeDeck } from '@/components/SwipeDeck';
 import { Toast } from '@/components/Toast';
 import { WhatToBuyPane } from '@/components/WhatToBuyPane';
 import { AboutPanel } from '@/components/panels/AboutPanel';
+import { BackupPanel } from '@/components/panels/BackupPanel';
 import { CombinationsPanel } from '@/components/panels/CombinationsPanel';
 import { ReminderPanel } from '@/components/panels/ReminderPanel';
 import { SavedPanel } from '@/components/panels/SavedPanel';
@@ -26,30 +26,40 @@ import { useUiStore } from '@/store/uiStore';
 import { fonts } from '@/theme/fonts';
 import { useTheme } from '@/theme/useTheme';
 
+const hashDay = (s: string) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+};
+
 export default function Main() {
   const t = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const motion = useMotion();
   const [pane, setPane] = useState<Pane>('rec');
+  const [onToday, setOnToday] = useState(false);
 
   const current = useStore((s) => s.current);
   const deckPos = useStore((s) => s.deckPos);
   const style = useStore((s) => s.style);
   const setStyle = useStore((s) => s.setStyle);
-  const browseMode = useStore((s) => s.browseMode);
   const tops = useStore((s) => s.tops);
   const bottoms = useStore((s) => s.bottoms);
   const depth = useStore((s) => s.depth);
   const worn = useStore((s) => s.worn);
+  const dismissed = useStore((s) => s.dismissed);
   const regenerate = useStore((s) => s.regenerate);
-  const another = useStore((s) => s.another);
   const next = useStore((s) => s.next);
   const prev = useStore((s) => s.prev);
+  const goToIndex = useStore((s) => s.goToIndex);
   const markWorn = useStore((s) => s.markWorn);
+  const dismiss = useStore((s) => s.dismiss);
   const saveCurrent = useStore((s) => s.saveCurrent);
   const clearWorn = useStore((s) => s.clearWorn);
   const saved = useStore((s) => s.saved);
+  const lastPickDay = useStore((s) => s.lastPickDay);
+  const setLastPickDay = useStore((s) => s.setLastPickDay);
 
   const openDrawer = useUiStore((s) => s.openDrawer);
   const openPanel = useUiStore((s) => s.openPanel);
@@ -59,10 +69,24 @@ export default function Main() {
   const showToast = useUiStore((s) => s.showToast);
   const panel = useUiStore((s) => s.panel);
 
+  // The browsable deck (excludes "not for me") — drives the counter + worn progress.
+  const deck = useMemo(
+    () => buildDeck({ tops, bottoms, skin: skinObj(depth), style }).filter((c) => !dismissed[c.id]),
+    [tops, bottoms, depth, style, dismissed]
+  );
+  const total = deck.length;
+  const wornCount = useMemo(() => deck.filter((c) => worn[c.id]).length, [deck, worn]);
+
+  // First entry: seed a decisive "Today's pick" once a day (a strong, day-stable look).
   useLayoutEffect(() => {
-    if (!current) {
-      if (browseMode === 'swipe') next();
-      else regenerate();
+    const day = new Date().toISOString().slice(0, 10);
+    if (deck.length && lastPickDay !== day) {
+      const span = Math.max(1, Math.ceil(deck.length * 0.3));
+      goToIndex(hashDay(day) % span);
+      setLastPickDay(day);
+      setOnToday(true);
+    } else if (!current) {
+      regenerate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -86,36 +110,26 @@ export default function Main() {
     return () => sub.remove();
   }, [panel, drawerOpen, closePanel, closeDrawer, pane]);
 
-  const skin = skinObj(depth);
-  const { total, worn: wornCount } = uniStats(tops, bottoms, skin, worn);
   const isSaved = !!current && saved.some((x) => x.t === current.t && x.b === current.b);
 
-  // When everything's been worn, offer to reset the worn history (once per all-worn state).
+  // Offer to reset worn history once everything's been worn.
   const prompted = useRef(false);
   useEffect(() => {
     const allWorn = total > 0 && wornCount >= total;
     if (allWorn && !prompted.current) {
       prompted.current = true;
-      Alert.alert(
-        'You’ve worn them all',
-        `That’s all ${total} combinations marked worn. Reset your worn history to start a fresh round?`,
-        [
-          { text: 'Not now', style: 'cancel' },
-          { text: 'Reset worn', style: 'destructive', onPress: () => { clearWorn(); regenerate(); } },
-        ]
-      );
+      Alert.alert('You’ve worn them all', `That’s all ${total} combinations. Reset your worn history to start a fresh round?`, [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Reset worn', style: 'destructive', onPress: () => { clearWorn(); regenerate(); } },
+      ]);
     }
     if (!allWorn) prompted.current = false;
   }, [wornCount, total, clearWorn, regenerate]);
 
-  const onAnother = () => {
-    const roundDone = another();
-    if (roundDone) showToast("You've seen them all — looping back round");
-  };
-  const onWore = () => {
-    markWorn();
-    showToast("Marked worn — here's a fresh one");
-  };
+  const onNext = () => { setOnToday(false); next(); };
+  const onPrev = () => { setOnToday(false); prev(); };
+  const onWore = () => { setOnToday(false); markWorn(); showToast("Marked worn — here's a fresh one"); };
+  const onDismiss = () => { setOnToday(false); dismiss(); showToast('Hidden — find it under “Not for me”'); };
   const onSave = (): boolean => {
     if (isSaved) {
       showToast('Already in your looks');
@@ -133,8 +147,10 @@ export default function Main() {
           <Icon name="menu" size={18} color={t.ink} />
         </Pressable>
         <View style={styles.brand}>
-          <Logo size={24} />
-          <Text style={[styles.brandTxt, { color: t.ink, fontFamily: fonts.uiBold }]}>ColorCloset</Text>
+          <Logo size={26} />
+          <Text style={[styles.brandTxt, { color: t.ink, fontFamily: fonts.display }]}>
+            Color<Text style={{ color: t.accent }}>Closet</Text>
+          </Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
@@ -143,25 +159,19 @@ export default function Main() {
         <Segmented value={pane} onChange={setPane} />
       </View>
 
-      {/* sticky status — always visible (no scroll needed): swipe counter or worn progress */}
+      {/* sticky status — always visible without scrolling */}
       {pane === 'rec' && current && (
         <View style={styles.status}>
-          {browseMode === 'swipe' ? (
-            <View style={styles.swipeStatus}>
-              <Text style={[styles.counter, { color: t.muted, fontFamily: fonts.monoBold }]}>
-                <Text style={{ color: t.accent }}>{(deckPos < 0 ? 0 : deckPos) + 1}</Text> of {total}
-              </Text>
-              <Text style={[styles.hint, { color: t.faint, fontFamily: fonts.uiRegular }]}>Swipe · double-tap to save</Text>
+          <Text style={[styles.counter, { color: t.muted, fontFamily: fonts.monoBold }]}>
+            <Text style={{ color: t.accent }}>{(deckPos < 0 ? 0 : deckPos) + 1}</Text> of {total}
+          </Text>
+          {onToday ? (
+            <View style={[styles.todayPill, { borderColor: t.accent, backgroundColor: 'rgba(201,168,106,0.12)' }]}>
+              <Icon name="star" size={12} color={t.accent} />
+              <Text style={[styles.todayTxt, { color: t.accent, fontFamily: fonts.uiBold }]}>TODAY’S PICK</Text>
             </View>
           ) : (
-            <View style={styles.prog}>
-              <ProgressBar pct={total ? Math.round((wornCount / total) * 100) : 0} />
-              <Pressable onPress={() => openPanel('combos')} style={[styles.progLabel, { backgroundColor: t.glass2, borderColor: t.line2 }]}>
-                <Text style={[styles.progTxt, { color: t.ink, fontFamily: fonts.monoBold }]}>
-                  Worn <Text style={{ color: t.accent }}>{wornCount}</Text> of {total} · list ›
-                </Text>
-              </Pressable>
-            </View>
+            <Text style={[styles.hint, { color: t.faint, fontFamily: fonts.uiRegular }]}>Swipe · double-tap to save</Text>
           )}
         </View>
       )}
@@ -175,13 +185,9 @@ export default function Main() {
             <Text style={[styles.chLabel, { color: t.faint, fontFamily: fonts.mono }]}>STYLE</Text>
             <ChipRow items={STYLES.map((s) => ({ value: s as StyleName, label: s }))} value={style} onChange={setStyle} />
 
-            <View style={{ marginTop: 14 }}>
+            <View style={{ marginTop: 12 }}>
               {current ? (
-                browseMode === 'swipe' ? (
-                  <SwipeDeck pos={deckPos} total={total} onNext={next} onPrev={prev} onSave={onSave} />
-                ) : (
-                  <OutfitCard />
-                )
+                <SwipeDeck pos={deckPos} total={total} onNext={onNext} onPrev={onPrev} onSave={onSave} />
               ) : (
                 <View style={styles.emptyRec}>
                   <View style={[styles.emptyIc, { backgroundColor: t.glass, borderColor: t.line }]}>
@@ -205,12 +211,12 @@ export default function Main() {
         )}
       </ScrollView>
 
-      {/* always-visible action bar */}
+      {/* always-visible action bar: not-for-me · save · mark worn */}
       {pane === 'rec' && current && (
         <View style={[styles.bar, { backgroundColor: t.bg, borderTopColor: t.line, paddingBottom: insets.bottom + 10 }]}>
-          {browseMode === 'classic' && (
-            <Button title="Another" variant="goldline" onPress={onAnother} style={{ flex: 1 }} icon={<Icon name="refresh" size={18} color={t.goldSoft} strokeWidth={2.2} />} />
-          )}
+          <Pressable accessibilityRole="button" accessibilityLabel="Not for me" onPress={onDismiss} style={[styles.iconAct, { borderColor: t.line2 }]}>
+            <Icon name="x" size={20} color={t.muted} strokeWidth={2.4} />
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={isSaved ? 'Saved' : 'Save look'}
@@ -220,7 +226,7 @@ export default function Main() {
           >
             <Icon name={isSaved ? 'heart-fill' : 'heart'} size={20} color={t.accent} />
           </Pressable>
-          <Button title="Mark it worn" onPress={onWore} style={{ flex: 1.2 }} icon={<Icon name="check" size={18} color={t.onGold} strokeWidth={2.6} />} />
+          <Button title="Mark it worn" onPress={onWore} style={{ flex: 1 }} icon={<Icon name="check" size={18} color={t.onGold} strokeWidth={2.6} />} />
         </View>
       )}
 
@@ -229,6 +235,7 @@ export default function Main() {
       {panel === 'combos' && <CombinationsPanel />}
       {panel === 'saved' && <SavedPanel />}
       {panel === 'reminder' && <ReminderPanel />}
+      {panel === 'backup' && <BackupPanel />}
       <SideMenu />
       <Toast />
     </View>
@@ -240,17 +247,15 @@ const styles = StyleSheet.create({
   topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 16, paddingBottom: 10 },
   hamb: { width: 40, height: 40, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  brandTxt: { fontSize: 15 },
-  status: { paddingHorizontal: 18, paddingTop: 12 },
-  swipeStatus: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  brandTxt: { fontSize: 19, letterSpacing: -0.3 },
+  status: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 12 },
   counter: { fontSize: 13 },
   hint: { fontSize: 11 },
+  todayPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 99, paddingVertical: 4, paddingHorizontal: 10 },
+  todayTxt: { fontSize: 10, letterSpacing: 0.8 },
   chLabel: { fontSize: 10, letterSpacing: 1.6, marginTop: 8, marginBottom: 7 },
-  prog: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  progLabel: { borderWidth: 1, borderRadius: 99, paddingVertical: 7, paddingHorizontal: 13 },
-  progTxt: { fontSize: 11 },
   bar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 10, alignItems: 'stretch', paddingHorizontal: 18, paddingTop: 10, borderTopWidth: 1 },
-  iconAct: { width: 56, borderWidth: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  iconAct: { width: 56, borderWidth: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center', paddingVertical: 14 },
   emptyRec: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 20 },
   emptyIc: { width: 56, height: 56, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   emptyH: { fontSize: 19, marginBottom: 7, textAlign: 'center' },
