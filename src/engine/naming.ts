@@ -26,7 +26,7 @@ export function nameFor(
   style?: StyleName | null,
   rng: () => number = Math.random
 ): string {
-  if ((t === 'Navy' || b === 'Navy' || t === 'Blue') && CORP.has(t) && CORP.has(b)) {
+  if ((t === 'Navy' || b === 'Navy' || t === 'Blue' || b === 'Blue') && CORP.has(t) && CORP.has(b)) {
     return 'Corporate Blue';
   }
   const c = style ? style.toUpperCase() : catFor(t, b);

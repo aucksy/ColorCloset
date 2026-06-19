@@ -46,9 +46,10 @@ describe('score (combined) is NOT clamped', () => {
   it('sums harmony + flatter + office lean + style', () => {
     const skin = skinObj('medium');
     // Mustard+Navy @ Bold, Medium skin:
-    // harmony 1.0 (clamped) + flatter (Mustard .08) + office lean (CORP Navy .04 +
-    // neutral bottom Navy .03) + Bold style .37 = 1.52
-    expect(score('Mustard', 'Navy', skin, 'Bold')).toBeCloseTo(1.52, 10);
+    // harmony 1.0 (clamped) + flatter (Mustard .08) + office lean (CORP Navy .04;
+    // the neutral-bottom nudge is skipped since Navy is already corporate) +
+    // Bold style .37 = 1.49
+    expect(score('Mustard', 'Navy', skin, 'Bold')).toBeCloseTo(1.49, 10);
   });
 
   it('rewards a corporate, flattering office pairing', () => {

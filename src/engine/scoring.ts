@@ -77,10 +77,11 @@ export function score(
   if (fl.includes(t)) s += 0.08;
   if (fl.includes(b)) s += 0.06;
   // Gentle office lean: clean/corporate colours read a touch better by default,
-  // and a grounded neutral trouser is the office staple.
+  // and a grounded neutral trouser is the office staple. The neutral-bottom nudge
+  // only applies when the trouser isn't already counted as corporate (no double-up).
   if (CORP.has(t)) s += 0.03;
   if (CORP.has(b)) s += 0.04;
-  if (NEUTRAL.has(b)) s += 0.03;
+  else if (NEUTRAL.has(b)) s += 0.03;
   s += styleBias(t, b, style);
   return s;
 }

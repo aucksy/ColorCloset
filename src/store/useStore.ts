@@ -204,7 +204,7 @@ export const useStore = create<Store>()(
         const deck = deckFor(s);
         if (!deck.length) return;
         const n = deck.length;
-        const pos = ((s.deckPos === -1 ? -1 : s.deckPos) + 1) % n;
+        const pos = (s.deckPos + 1) % n; // deckPos -1 -> 0 on first step
         const pick = deck[pos];
         set({ current: { t: pick.t, b: pick.b }, currentName: nameFor(pick.t, pick.b, s.style), deckPos: pos });
       },
@@ -223,11 +223,17 @@ export const useStore = create<Store>()(
         if (!s.current) return;
         const id = s.current.t + '|' + s.current.b;
         set({ worn: { ...s.worn, [id]: todayStr() } });
-        get().another();
+        // Advance the way the user is browsing: linear in swipe, worn-skip in classic.
+        if (get().browseMode === 'swipe') get().next();
+        else get().another();
       },
 
       loadCombo: (t, b) => {
-        set({ current: { t, b }, currentName: nameFor(t, b, get().style) });
+        const s = get();
+        // Sync deckPos to the loaded combo so the next walk/swipe continues from here
+        // and the swipe "x of N" counter stays correct.
+        const pos = deckFor(s).findIndex((c) => c.t === t && c.b === b);
+        set({ current: { t, b }, currentName: nameFor(t, b, s.style), deckPos: pos });
       },
 
       setStyle: (st) => {

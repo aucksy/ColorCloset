@@ -1,7 +1,7 @@
 /**
- * The 16-colour model and shade generation.
- * Ported verbatim from the prototype (lines ~602-620, 9.1 / Appendix A in the PRD).
- * All transforms reproduce the prototype's exact hex output.
+ * The 18-colour model and shade generation. Ported from the prototype's 16 colours
+ * (lines ~602-620, 9.1 / Appendix A) plus Brown and Maroon added for the office /
+ * Indian-wardrobe positioning. Shade transforms reproduce the prototype's exact hex.
  */
 import type { ColorEntry, ColorKey, ShadeIndex } from './types';
 
@@ -118,7 +118,9 @@ export function nearest(r: number, g: number, b: number): ColorKey {
 export const NEUTRAL = new Set<ColorKey>([
   'White', 'Grey', 'Black', 'Beige', 'Cream', 'Charcoal', 'Khaki', 'Navy', 'Brown',
 ]);
-export const WARM = new Set<ColorKey>(['Beige', 'Cream', 'Khaki', 'Olive', 'Mustard', 'Rust', 'Brown', 'Maroon']);
+// Maroon is intentionally NOT here: it's a dark red that should behave like Burgundy
+// (which is in neither WARM nor COOL) so the two near-identical reds score alike.
+export const WARM = new Set<ColorKey>(['Beige', 'Cream', 'Khaki', 'Olive', 'Mustard', 'Rust', 'Brown']);
 export const COOL = new Set<ColorKey>([
   'Navy', 'Blue', 'Light Blue', 'Charcoal', 'Purple', 'Forest Green',
 ]);

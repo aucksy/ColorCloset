@@ -8,9 +8,9 @@ export const STYLES: StyleName[] = ['Minimal', 'Classic', 'Bold', 'Statement'];
 
 /**
  * Curated exemplar pairings per style (top/bottom interchangeable), retuned with an
- * India sensibility (jewel + warm-earth combinations, gold/neutral-bridged), kept
- * within the existing 16 colours. New-colour research suggestions are mapped to the
- * closest existing colour (Teal/Emerald→Forest Green, Maroon→Burgundy,
+ * India sensibility (jewel + warm-earth combinations, gold/neutral-bridged), across
+ * the 18 colours (Brown and Maroon are now first-class entries). Remaining research
+ * suggestions still map to the closest colour (Teal/Emerald→Forest Green,
  * Marigold→Mustard, Rani Pink→Purple).
  */
 export const GOOD: Record<StyleName, [string, string][]> = {

@@ -58,9 +58,13 @@ export default function Main() {
   const panel = useUiStore((s) => s.panel);
 
   // Ensure an outfit is showing on first entry (before paint, to avoid a flash of
-  // the empty state for returning users whose session `current` starts null).
+  // the empty state). Swipe mode seeds linearly so its counter opens at "1 of N";
+  // classic mode uses the worn-skipping walk.
   useLayoutEffect(() => {
-    if (!current) regenerate();
+    if (!current) {
+      if (browseMode === 'swipe') next();
+      else regenerate();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
