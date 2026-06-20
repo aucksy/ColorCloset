@@ -135,22 +135,22 @@ export default function Main() {
 
   const isSaved = !!current && w.saved.some((x) => x.t === current.t && x.b === current.b);
 
-  // Dismissible "double-tap to save" coachmark — shows once, after the first card
-  // entrance settles, only while browsing recs and never if already acknowledged.
+  // Dismissible "double-tap to save" coachmark — shows once, AFTER the user has swiped a
+  // card or two (not on the very first card), only while browsing recs, never if seen.
   const [coachVisible, setCoachVisible] = useState(false);
+  const [swipes, setSwipes] = useState(0);
   const coachShown = useRef(false);
   useEffect(() => {
     if (coachSeen || coachShown.current) return;
-    if (pane !== 'rec' || !current) return;
-    // Latch the one-shot guard only when it ACTUALLY shows — not when scheduled — so a
-    // swipe / style-change within the delay (which churns `current` and re-runs this
-    // effect) reschedules the timer instead of permanently suppressing the coachmark.
+    if (pane !== 'rec' || !current || swipes < 2) return;
+    // Latch the one-shot guard only when it ACTUALLY shows, so an interrupted timer
+    // reschedules rather than permanently suppressing the coachmark.
     const showId = setTimeout(() => {
       coachShown.current = true;
       setCoachVisible(true);
-    }, motion.base + 700);
+    }, 400);
     return () => clearTimeout(showId);
-  }, [coachSeen, pane, current, motion.base]);
+  }, [coachSeen, pane, current, swipes]);
 
   // Auto-dismiss the coachmark after a few seconds once it's on screen.
   useEffect(() => {
@@ -184,6 +184,7 @@ export default function Main() {
   const onStyle = (s: StyleName) => { setOnToday(false); setStyle(s); };
   const onNext = () => {
     setOnToday(false);
+    setSwipes((n) => n + 1);
     // On the last card of this style, hop to the next non-empty style (cyclic via STYLES
     // order from the current one) instead of wrapping — so swiping flows across styles.
     if (total > 0 && deckPos >= total - 1) {
@@ -200,7 +201,7 @@ export default function Main() {
     }
     next();
   };
-  const onPrev = () => { setOnToday(false); prev(); };
+  const onPrev = () => { setOnToday(false); setSwipes((n) => n + 1); prev(); };
   const onWore = () => { setOnToday(false); markWorn(); showToast("Marked worn — here's a fresh one"); };
   const onDismiss = () => { setOnToday(false); dismiss(); showToast('Hidden — find it under “Not for me”'); };
   const onSave = (): boolean => {
@@ -300,7 +301,7 @@ export default function Main() {
         )}
       </ScrollView>
 
-      {/* dismissible coachmark — appears once after the first card settles */}
+      {/* dismissible coachmark — appears once after the user has swiped a couple of cards */}
       {pane === 'rec' && current && coachVisible && (
         <Pressable
           accessibilityRole="button"
@@ -322,7 +323,7 @@ export default function Main() {
       {pane === 'rec' && current && (
         <View style={[styles.bar, { backgroundColor: t.bg, borderTopColor: t.line, paddingBottom: insets.bottom + 10 }]}>
           <Pressable accessibilityRole="button" accessibilityLabel="Not for me" onPress={onDismiss} style={[styles.iconAct, { borderColor: t.line2 }]}>
-            <Icon name="x" size={20} color={t.muted} strokeWidth={2.4} />
+            <Icon name="thumbs-down" size={20} color={t.muted} strokeWidth={2} />
           </Pressable>
           <Pressable
             accessibilityRole="button"

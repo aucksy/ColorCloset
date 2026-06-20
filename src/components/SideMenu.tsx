@@ -99,7 +99,7 @@ export function SideMenu() {
           <Item t={t} icon="setup" label="Set up again" onPress={setupAgain} />
           <Item t={t} icon="download" label="Backup & restore" onPress={() => openPanel('backup')} />
           <Item t={t} icon="info" label="How it works" onPress={() => openPanel('about')} />
-          <Item t={t} icon="star" label="Colour science" onPress={() => openPanel('sources')} />
+          <Item t={t} icon="star" label="Colour science" onPress={() => openPanel('sources')} highlight />
           <Item t={t} icon="reset" label="Reset wardrobe" onPress={reset} />
 
           <Text style={[styles.foot, { color: t.faint, fontFamily: fonts.uiRegular }]}>
@@ -159,18 +159,34 @@ function Item({
   label,
   onPress,
   right,
+  highlight,
 }: {
   t: ReturnType<typeof useTheme>;
   icon: IconName;
   label: string;
   onPress: () => void;
   right?: string;
+  /** Draw attention to a new/important entry (accent icon + tint + NEW badge). */
+  highlight?: boolean;
 }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.item, { opacity: pressed ? 0.6 : 1 }]}>
-      <Icon name={icon} size={19} color={t.muted} />
-      <Text style={[styles.itemTxt, { color: t.ink, fontFamily: fonts.ui }]}>{label}</Text>
-      {right != null && <Text style={[styles.right, { color: t.muted, fontFamily: fonts.uiSemi }]}>{right}</Text>}
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.item,
+        highlight && { backgroundColor: 'rgba(201,168,106,0.12)', borderWidth: 1, borderColor: t.accent },
+        { opacity: pressed ? 0.6 : 1 },
+      ]}
+    >
+      <Icon name={icon} size={19} color={highlight ? t.accent : t.muted} />
+      <Text style={[styles.itemTxt, { color: t.ink, fontFamily: highlight ? fonts.uiSemi : fonts.ui }]}>{label}</Text>
+      {right != null ? (
+        <Text style={[styles.right, { color: t.muted, fontFamily: fonts.uiSemi }]}>{right}</Text>
+      ) : highlight ? (
+        <View style={[styles.newBadge, { backgroundColor: t.accent }]}>
+          <Text style={[styles.newTxt, { color: t.onGold, fontFamily: fonts.monoBold }]}>NEW</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -223,6 +239,8 @@ const styles = StyleSheet.create({
   item: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 12, borderRadius: 14 },
   itemTxt: { fontSize: 14.5 },
   right: { marginLeft: 'auto', fontSize: 12 },
+  newBadge: { marginLeft: 'auto', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 3 },
+  newTxt: { fontSize: 8.5, letterSpacing: 0.6 },
   switch: { marginLeft: 'auto', width: 42, height: 24, borderRadius: 99, justifyContent: 'center' },
   knob: { position: 'absolute', top: 3, width: 18, height: 18, borderRadius: 9, backgroundColor: '#fff' },
   div: { height: 1, marginVertical: 10, marginHorizontal: 6 },

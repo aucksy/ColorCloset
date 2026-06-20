@@ -72,20 +72,20 @@ export function OutfitCard() {
 
       <View style={styles.sils}>
         <View style={styles.sil}>
-          <GarmentSilhouette kind="top" color={topHex} duration={motion.slow} />
+          <View style={styles.silBox}>
+            <GarmentSilhouette kind="top" color={topHex} duration={motion.slow} />
+          </View>
           <Text style={[styles.lab, { color: t.ink, fontFamily: fonts.uiBold }]}>{topName}</Text>
-          {topName !== topK && (
-            <Text style={[styles.base, { color: t.faint, fontFamily: fonts.uiRegular }]}>{topK}</Text>
-          )}
           <Text style={[styles.sub, { color: t.muted, fontFamily: fonts.mono }]}>SHIRT</Text>
         </View>
-        <Text style={[styles.plus, { color: t.faint, fontFamily: fonts.display }]}>+</Text>
+        <View style={styles.plusBox}>
+          <Text style={[styles.plus, { color: t.faint, fontFamily: fonts.display }]}>+</Text>
+        </View>
         <View style={styles.sil}>
-          <GarmentSilhouette kind="bottom" color={botHex} duration={motion.slow} />
+          <View style={styles.silBox}>
+            <GarmentSilhouette kind="bottom" color={botHex} duration={motion.slow} />
+          </View>
           <Text style={[styles.lab, { color: t.ink, fontFamily: fonts.uiBold }]}>{botName}</Text>
-          {botName !== botK && (
-            <Text style={[styles.base, { color: t.faint, fontFamily: fonts.uiRegular }]}>{botK}</Text>
-          )}
           <Text style={[styles.sub, { color: t.muted, fontFamily: fonts.mono }]}>TROUSERS</Text>
         </View>
       </View>
@@ -145,12 +145,16 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', width: '100%' },
   cat: { fontSize: 10, letterSpacing: 2, textAlign: 'center' },
   name: { fontSize: 30, marginTop: 7, marginBottom: 14, textAlign: 'center', letterSpacing: -0.3 },
-  sils: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 16, minHeight: 210, width: '100%' },
+  // Align the two garments by giving each silhouette an identical fixed-height box and
+  // anchoring the row at the top — so unequal label heights can never shift one garment
+  // up relative to the other. The "+" is vertically centred against the silhouettes.
+  sils: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', gap: 16, width: '100%' },
   sil: { width: 130, alignItems: 'center' },
+  silBox: { width: '100%', height: 210, justifyContent: 'flex-end' },
   lab: { marginTop: 11, fontSize: 12.5, textAlign: 'center' },
-  base: { fontSize: 10, marginTop: 2, textAlign: 'center' },
   sub: { fontSize: 9, letterSpacing: 0.8, marginTop: 3 },
-  plus: { fontSize: 22, alignSelf: 'center', marginBottom: 36 },
+  plusBox: { height: 210, justifyContent: 'center' },
+  plus: { fontSize: 22 },
   leather: { borderWidth: 1, borderRadius: 14, paddingVertical: 11, paddingHorizontal: 14, marginTop: 14, alignSelf: 'stretch', gap: 9 },
   leatherLab: { fontSize: 9, letterSpacing: 1.4 },
   leatherItems: { flexDirection: 'row', gap: 22 },
