@@ -89,35 +89,26 @@ export function mix(hex: string, t: number): string {
   return '#' + h(r) + h(g) + h(b);
 }
 
-/** Squared Euclidean RGB distance between two hexes (used to pick the base shade). */
-function rgbDist2(a: string, b: string): number {
-  const [r1, g1, b1] = rgb(a);
-  const [r2, g2, b2] = rgb(b);
-  return (r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2;
-}
+/**
+ * Tier labels for the 5-step light→dark shade ramp (index 2 = base, unlabelled).
+ * Drives the shade names ("Deep Navy") and the shade-picker rows.
+ */
+export const SHADE_TIERS = ['Lightest', 'Light', 'Mid', 'Deep', 'Deepest'] as const;
 
 /**
- * Build the COLORS table from SHADE_VOCAB: per base, gather its named shades in doc
- * order (5 for most bases, 6 for Beige), then pick `baseIdx` as the shade nearest the
- * "(base #..)" header hex by Euclidean RGB — that shade is the display default.
+ * Build the COLORS table as a simple light→dark ramp per base (the user-preferred
+ * model): lighten 34%, lighten 17%, base, darken 18%, darken 34%. Every base has the
+ * same 5 steps; `baseIdx` is always 2 (the true base hex). Shade names are tier-prefixed
+ * (e.g. "Light Navy" / "Navy" / "Deep Navy") so a colour's shades read as one hue from
+ * light to deep and always match the main swatch. (The research SHADE_VOCAB is no longer
+ * the user-facing shade source — it survives only as the combo→base lookup in combos.ts.)
  */
 export const COLORS: Record<ColorKey, ColorEntry> = KEYS.reduce(
   (acc, k) => {
     const base = BASE_HEX[k];
-    const entries = SHADE_VOCAB.filter((s) => s.base === k);
-    const shades = entries.map((s) => s.hex);
-    const shadeNames = entries.map((s) => s.shade);
-    // Display default = shade whose hex is nearest the base hex (Euclidean RGB).
-    let baseIdx = 0;
-    let best = Infinity;
-    shades.forEach((hex, i) => {
-      const d = rgbDist2(hex, base);
-      if (d < best) {
-        best = d;
-        baseIdx = i;
-      }
-    });
-    acc[k] = { hex: base, rgb: rgb(base), shades, shadeNames, baseIdx };
+    const shades = [mix(base, 0.34), mix(base, 0.17), base, mix(base, -0.18), mix(base, -0.34)];
+    const shadeNames = SHADE_TIERS.map((tier, i) => (i === 2 ? k : `${tier} ${k}`));
+    acc[k] = { hex: base, rgb: rgb(base), shades, shadeNames, baseIdx: 2 };
     return acc;
   },
   {} as Record<ColorKey, ColorEntry>

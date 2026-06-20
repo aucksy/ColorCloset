@@ -2,14 +2,13 @@ import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import {
   LEATHER_HEX,
-  catFor,
   comboWhy,
   findCurated,
   leatherFor,
   shadeHex,
-  shadeHexByName,
   shadeName,
   skinObj,
+  styleOf,
   tierNote,
 } from '@/engine';
 import { GarmentSilhouette } from '@/components/GarmentSilhouette';
@@ -40,17 +39,19 @@ export function OutfitCard() {
   const topIdx = w.shadeTops[topK]?.[0];
   const botIdx = w.shadeBottoms[botK]?.[0];
 
-  // Display names + silhouette colours: curated shade names/hexes when curated,
-  // otherwise the owned (or default) shade for the base.
-  const topName = cur ? cur.topShade : shadeName(topK, topIdx);
-  const botName = cur ? cur.bottomShade : shadeName(botK, botIdx);
-  const topHex = cur ? shadeHexByName(cur.topShade) : shadeHex(topK, topIdx);
-  const botHex = cur ? shadeHexByName(cur.bottomShade) : shadeHex(botK, botIdx);
+  // Display names + silhouette colours: ALWAYS the user's OWNED shade for each base
+  // (so "Navy" shows the user's navy, not the curated #000080; "Ink Black" shows as
+  // the owned Ink/Deep Black, not collapsed to base "Black").
+  const topName = shadeName(topK, topIdx);
+  const botName = shadeName(botK, botIdx);
+  const topHex = shadeHex(topK, topIdx);
+  const botHex = shadeHex(botK, botIdx);
 
-  // Eyebrow: category label + (specific curated region, e.g. "JAPANESE/TOKYO").
-  const catLabel = catFor(topK, botK, gender ?? undefined, mode);
+  // Eyebrow: the combo's STYLE (one of the 4 — never Neutral/Everyday) + (specific
+  // curated region, e.g. "STATEMENT · JAPANESE/TOKYO").
+  const styleLabel = styleOf(topK, botK, cur).toUpperCase();
   const regionSpecific = cur && !cur.region.startsWith('Universal');
-  const eyebrow = regionSpecific ? `${catLabel} · ${cur!.region.toUpperCase()}` : catLabel;
+  const eyebrow = regionSpecific ? `${styleLabel} · ${cur!.region.toUpperCase()}` : styleLabel;
 
   // "Why" rationale (named-shade aware, shade names bold).
   const why = comboWhy({ t: topK, b: botK, curated: cur, topShadeIdx: topIdx, bottomShadeIdx: botIdx });

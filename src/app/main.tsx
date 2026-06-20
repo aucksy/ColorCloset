@@ -82,6 +82,24 @@ export default function Main() {
   const total = deck.length;
   const wornCount = useMemo(() => deck.filter((c) => w.worn[c.id]).length, [deck, w.worn]);
 
+  // Per-style browsable deck size (post "not for me"), so onNext can hop to the next
+  // non-empty style once the current style's cards are exhausted (#15 auto-advance).
+  const styleLen = useMemo(
+    () =>
+      STYLES.reduce((m, s) => {
+        m[s] = buildDeck({
+          tops: w.tops,
+          bottoms: w.bottoms,
+          skin: skinObj(mst),
+          style: s,
+          gender,
+          mode,
+        }).filter((c) => !w.dismissed[c.id]).length;
+        return m;
+      }, {} as Record<StyleName, number>),
+    [w.tops, w.bottoms, w.dismissed, mst, gender, mode]
+  );
+
   // First entry: seed a decisive "Today's pick" once a day (a strong, day-stable look).
   useLayoutEffect(() => {
     const day = new Date().toISOString().slice(0, 10);
@@ -164,7 +182,24 @@ export default function Main() {
   }, [wornCount, total, clearWorn, regenerate]);
 
   const onStyle = (s: StyleName) => { setOnToday(false); setStyle(s); };
-  const onNext = () => { setOnToday(false); next(); };
+  const onNext = () => {
+    setOnToday(false);
+    // On the last card of this style, hop to the next non-empty style (cyclic via STYLES
+    // order from the current one) instead of wrapping — so swiping flows across styles.
+    if (total > 0 && deckPos >= total - 1) {
+      const i = STYLES.indexOf(style);
+      const nextStyle =
+        i >= 0
+          ? STYLES.slice(i + 1).concat(STYLES.slice(0, i)).find((s) => styleLen[s] > 0)
+          : undefined;
+      if (nextStyle) {
+        setStyle(nextStyle);
+        showToast(`That's all your ${style} looks — showing ${nextStyle}`);
+        return;
+      }
+    }
+    next();
+  };
   const onPrev = () => { setOnToday(false); prev(); };
   const onWore = () => { setOnToday(false); markWorn(); showToast("Marked worn — here's a fresh one"); };
   const onDismiss = () => { setOnToday(false); dismiss(); showToast('Hidden — find it under “Not for me”'); };

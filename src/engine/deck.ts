@@ -14,9 +14,9 @@
  * Data/shape contract: ENGINE_REBUILD_SPEC §8. Scoring lives in `./scoring`, curated
  * lookup in `./combos`.
  */
-import { score, isAvoided } from './scoring';
+import { score, isAvoided, styleOf } from './scoring';
 import { findCurated } from './combos';
-import { UNIVERSE_THRESHOLD } from './constants';
+import { STYLES, UNIVERSE_THRESHOLD } from './constants';
 import type { ColorKey, Combo, Gender, Mode, RankedCombo, SkinObj, StyleName } from './types';
 
 /**
@@ -50,17 +50,12 @@ export function comboUniverse(
     bottoms.forEach((b) => {
       const avoided = isAvoided(t, b);
       const sc = score(t, b, skin, undefined, ctx);
-      const cand: Combo = { id: t + '|' + b, t, b, sc };
+      const curated = (gender && mode ? findCurated(t, b, gender, mode) : undefined) ?? undefined;
+      const cand: Combo = { id: t + '|' + b, t, b, sc, style: styleOf(t, b, curated), curated };
       if (!bestAny || sc > bestAny.sc) bestAny = cand;
       if (avoided) return; // suppressed base pair — never in the universe (except fallback)
       if (!bestOpen || sc > bestOpen.sc) bestOpen = cand;
-
-      const curated = gender && mode ? findCurated(t, b, gender, mode) : undefined;
-      if (curated) {
-        out.push({ ...cand, curated });
-      } else if (sc >= UNIVERSE_THRESHOLD) {
-        out.push(cand);
-      }
+      if (curated || sc >= UNIVERSE_THRESHOLD) out.push(cand);
     })
   );
 
@@ -128,12 +123,13 @@ export function deckKey(ctx: DeckContext): string {
 }
 
 /**
- * The universe re-scored for the current style (and gender×mode curated bonus), sorted
- * best-first by the occasion/style score `osc`. The curated `meta` carried by the
- * universe is preserved so cards keep their named-shade copy.
+ * The deck for the current style: the universe FILTERED to `ctx.style` (the Style chips
+ * are a hard filter, not just a re-rank), re-scored by `osc`, sorted best-first, then
+ * diversified so consecutive cards don't repeat the same trouser/top.
  */
 export function buildDeck(ctx: DeckContext): RankedCombo[] {
-  return comboUniverse(ctx.tops, ctx.bottoms, ctx.skin, ctx.gender, ctx.mode)
+  const ranked = comboUniverse(ctx.tops, ctx.bottoms, ctx.skin, ctx.gender, ctx.mode)
+    .filter((c) => c.style === ctx.style)
     .map((c) => ({
       ...c,
       osc: score(c.t, c.b, ctx.skin, ctx.style, {
@@ -142,6 +138,46 @@ export function buildDeck(ctx: DeckContext): RankedCombo[] {
       }),
     }))
     .sort((a, b) => b.osc - a.osc);
+  return diversify(ranked);
+}
+
+/**
+ * Deterministic anti-clustering pass (#8/#13): keep the best card first, then always
+ * take the next-highest-`osc` card whose BOTTOM differs from the previous card (and, when
+ * possible, whose TOP also differs), so the user doesn't see the same trouser colour — or
+ * the same shade of one colour — back-to-back. Falls back to next-best when nothing else
+ * is available. No randomness, so the order stays stable/testable.
+ */
+function diversify(deck: RankedCombo[]): RankedCombo[] {
+  if (deck.length <= 2) return deck;
+  const remaining = deck.slice();
+  const out: RankedCombo[] = [remaining.shift()!];
+  while (remaining.length) {
+    const prev = out[out.length - 1];
+    let i = remaining.findIndex((c) => c.b !== prev.b && c.t !== prev.t);
+    if (i === -1) i = remaining.findIndex((c) => c.b !== prev.b);
+    if (i === -1) i = 0;
+    out.push(remaining.splice(i, 1)[0]);
+  }
+  return out;
+}
+
+/**
+ * Number of deck combos per style for the owned wardrobe (universe-level, before
+ * "not for me"), so the UI knows which styles are non-empty for the exhaust→advance flow.
+ */
+export function styleCounts(
+  tops: ColorKey[],
+  bottoms: ColorKey[],
+  skin: SkinObj | null,
+  gender: Gender | null,
+  mode: Mode
+): Record<StyleName, number> {
+  const counts = STYLES.reduce((acc, s) => ((acc[s] = 0), acc), {} as Record<StyleName, number>);
+  comboUniverse(tops, bottoms, skin, gender, mode).forEach((c) => {
+    counts[c.style] += 1;
+  });
+  return counts;
 }
 
 export interface StepResult {

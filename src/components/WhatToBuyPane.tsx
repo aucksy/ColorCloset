@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { gapSuggestions, skinObj } from '@/engine';
+import { STYLES, gapSuggestions, skinObj, type StyleName } from '@/engine';
 import { BuyCard } from '@/components/BuyCard';
+import { ChipRow } from '@/components/ChipRow';
 import { Icon } from '@/components/Icon';
 import { useActiveWardrobe, useStore } from '@/store/useStore';
 import { fonts } from '@/theme/fonts';
@@ -13,8 +14,10 @@ export function WhatToBuyPane() {
   const mst = useStore((s) => s.mst);
   const gender = useStore((s) => s.gender);
   const mode = useStore((s) => s.mode);
+  const style = useStore((s) => s.style);
+  const setStyle = useStore((s) => s.setStyle);
 
-  const { asTops, asBottoms } = gapSuggestions(w.tops, w.bottoms, skinObj(mst), gender ?? undefined, mode);
+  const { asTops, asBottoms } = gapSuggestions(w.tops, w.bottoms, skinObj(mst), gender ?? undefined, mode, style);
   const empty = asTops.length === 0 && asBottoms.length === 0;
 
   return (
@@ -23,8 +26,17 @@ export function WhatToBuyPane() {
         <Text style={[styles.eyebrow, { color: t.accent, fontFamily: fonts.mono }]}>SMART ADDITIONS</Text>
         <Text style={[styles.h, { color: t.ink, fontFamily: fonts.display }]}>One piece, more outfits</Text>
         <Text style={[styles.p, { color: t.muted, fontFamily: fonts.uiRegular }]}>
-          Based on the colours you own and what flatters you, these unlock the most new combinations.
+          Based on the colours you own and what flatters you, these unlock the most new {style} combinations.
         </Text>
+      </View>
+
+      <Text style={[styles.chLabel, { color: t.faint, fontFamily: fonts.mono }]}>STYLE</Text>
+      <View style={styles.chips}>
+        <ChipRow
+          items={STYLES.map((s) => ({ value: s as StyleName, label: s }))}
+          value={style}
+          onChange={setStyle}
+        />
       </View>
 
       {empty ? (
@@ -75,7 +87,9 @@ function SectionHeading({ t, children }: { t: ReturnType<typeof useTheme>; child
 }
 
 const styles = StyleSheet.create({
-  intro: { marginTop: 4, marginBottom: 16 },
+  intro: { marginTop: 4, marginBottom: 14 },
+  chLabel: { fontSize: 10, letterSpacing: 1.6, marginBottom: 7 },
+  chips: { marginBottom: 22 },
   eyebrow: { fontSize: 10, letterSpacing: 2.2, marginBottom: 8 },
   h: { fontSize: 23, marginBottom: 6 },
   p: { fontSize: 13, lineHeight: 20 },

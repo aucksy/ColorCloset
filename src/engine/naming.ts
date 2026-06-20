@@ -147,9 +147,11 @@ function generativeTail(t: ColorKey, b: ColorKey): string {
 export function comboWhy(args: ComboWhyArgs): RationaleSegment[] {
   const { t, b, curated, topShadeIdx, bottomShadeIdx } = args;
 
-  // Shade names: curated dataset names when curated, else the owned (or default) shade.
-  const topName = curated ? curated.topShade : shadeName(t, topShadeIdx);
-  const botName = curated ? curated.bottomShade : shadeName(b, bottomShadeIdx);
+  // Shade names always come from the user's OWNED shade in the simple light→dark model
+  // (e.g. "Deep Navy" / "Navy"), so the copy matches the garment shown on the card. The
+  // curated dataset still supplies the "why" tail (its mood/region live in the meta).
+  const topName = shadeName(t, topShadeIdx);
+  const botName = shadeName(b, bottomShadeIdx);
 
   const tail = curated ? ` — ${curated.why}` : generativeTail(t, b);
 

@@ -10,7 +10,6 @@ import {
   rgbString,
   shadeHex,
   shadeName,
-  shadeHexByName,
   NEUTRAL,
   WARM,
   COOL,
@@ -32,27 +31,23 @@ describe('palette: 17 bases + named shade vocabulary', () => {
     expect(COLORS.Brown.hex).toBe('#6B4423');
   });
 
-  it('most bases have 5 named shades; Beige has 6', () => {
-    expect(COLORS.Beige.shades).toHaveLength(6);
-    expect(COLORS.Beige.shadeNames).toHaveLength(6);
-    expect(COLORS.Navy.shades).toHaveLength(5);
-    expect(COLORS.Navy.shadeNames).toContain('French Navy');
-    KEYS.forEach((k) => expect(COLORS[k].shades.length).toBe(COLORS[k].shadeNames.length));
-  });
-
-  it('shadeHex / shadeName default to the base-near display shade (baseIdx)', () => {
+  it('every base is a simple 5-step light→dark ramp; baseIdx is the middle (base)', () => {
     KEYS.forEach((k) => {
-      expect(shadeHex(k, null)).toBe(COLORS[k].shades[COLORS[k].baseIdx]);
-      expect(shadeName(k, undefined)).toBe(COLORS[k].shadeNames[COLORS[k].baseIdx]);
+      expect(COLORS[k].shades).toHaveLength(5);
+      expect(COLORS[k].shadeNames).toHaveLength(5);
+      expect(COLORS[k].baseIdx).toBe(2);
+      expect(COLORS[k].shades[2]).toBe(COLORS[k].hex); // mid = base hex
+      // ramp goes light → dark by luminance
+      expect(lumHex(COLORS[k].shades[0])).toBeGreaterThan(lumHex(COLORS[k].shades[4]));
     });
   });
 
-  it('shadeHexByName resolves a named shade to its exact hex', () => {
-    expect(shadeHexByName('Sky Blue')).toBe('#87CEEB');
-    expect(shadeHexByName('Optic White')).toBe('#FFFFFF');
-    expect(shadeHexByName('Navy')).toBe('#000080'); // "Navy" IS a named shade (≠ base default)
-    // a base name with no same-named shade falls back to its display default
-    expect(shadeHexByName('Black')).toBe(shadeHex('Black', null));
+  it('shade names are tier-prefixed (Light/Deep …), base = the colour name', () => {
+    expect(shadeName('Navy', 2)).toBe('Navy');
+    expect(shadeName('Navy', 0)).toBe('Lightest Navy');
+    expect(shadeName('Navy', 3)).toBe('Deep Navy');
+    expect(shadeName('Navy', undefined)).toBe('Navy'); // null → baseIdx (2)
+    expect(shadeHex('Navy', null)).toBe(COLORS.Navy.hex);
   });
 
   it('rgb / lumHex / rgbString basics', () => {

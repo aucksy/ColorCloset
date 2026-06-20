@@ -1,15 +1,27 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  BackHandler,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GENDERS, GENDER_LABEL, comboUniverse, skinNote, skinObj, type Gender } from '@/engine';
+import { GENDERS, GENDER_LABEL, comboUniverse, skinNote, skinObj, type Gender, type Mode } from '@/engine';
 import { BuildingOverlay } from '@/components/BuildingOverlay';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { SkinGrid } from '@/components/SkinGrid';
 import { SwatchGrid } from '@/components/SwatchGrid';
 import { useActiveWardrobe, useStore } from '@/store/useStore';
+import { useUiStore } from '@/store/uiStore';
+import { isDriveConfigured, restoreFromDrive, signInToDrive } from '@/lib/drive';
 import { fonts } from '@/theme/fonts';
 import { useTheme } from '@/theme/useTheme';
 
@@ -44,6 +56,7 @@ export default function Onboarding() {
 
   const [step, setStep] = useState(0);
   const [building, setBuilding] = useState(false);
+  const [restoreOpen, setRestoreOpen] = useState(false);
   // Local gender choice — committed to the store only on Continue, so pendingWardrobe lands once.
   const [genderChoice, setGenderChoice] = useState<Gender | null>(gender);
 
@@ -162,6 +175,19 @@ export default function Onboarding() {
                   );
                 })}
               </View>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Already set up? Restore a backup"
+                onPress={() => setRestoreOpen(true)}
+                hitSlop={8}
+                style={styles.restoreLink}
+              >
+                <Text style={[styles.restoreLinkTxt, { color: t.muted, fontFamily: fonts.uiRegular }]}>
+                  Already set up?{' '}
+                  <Text style={{ color: t.accent, fontFamily: fonts.uiSemi }}>Restore a backup</Text>
+                </Text>
+              </Pressable>
             </>
           )}
 
@@ -237,6 +263,16 @@ export default function Onboarding() {
       </View>
 
       {building && <BuildingOverlay total={total} addedFrom={addMode ? beforeTotal : undefined} onDone={onBuilt} />}
+
+      <RestoreSheet
+        t={t}
+        visible={restoreOpen}
+        onClose={() => setRestoreOpen(false)}
+        onRestored={() => {
+          setRestoreOpen(false);
+          router.replace('/main');
+        }}
+      />
     </View>
   );
 }
@@ -244,14 +280,163 @@ export default function Onboarding() {
 type ThemeT = ReturnType<typeof useTheme>;
 
 function WardrobeStep({ t, slot, title, lead }: { t: ThemeT; slot: 'tops' | 'bottoms'; title: string; lead: string }) {
+  const mode = useStore((s) => s.mode);
+  const setMode = useStore((s) => s.setMode);
+  const modeLabel = mode === 'formal' ? 'Formal' : 'Casual';
   return (
     <>
       <Text style={[styles.title, { color: t.ink, fontFamily: fonts.display }]}>{title}</Text>
       <Lead t={t}>{lead}</Lead>
+
+      <ModeToggle t={t} mode={mode} onChange={setMode} />
+      <Text style={[styles.modeHint, { color: t.faint, fontFamily: fonts.uiRegular }]}>
+        Adding to your <Text style={{ color: t.muted, fontFamily: fonts.uiSemi }}>{modeLabel}</Text> wardrobe
+      </Text>
+
       <View style={{ marginTop: 18 }}>
         <SwatchGrid slot={slot} />
       </View>
     </>
+  );
+}
+
+/** Small segmented Formal/Casual control that drives the active wardrobe bucket. */
+function ModeToggle({ t, mode, onChange }: { t: ThemeT; mode: Mode; onChange: (m: Mode) => void }) {
+  const opts: { key: Mode; label: string }[] = [
+    { key: 'formal', label: 'Formal' },
+    { key: 'casual', label: 'Casual' },
+  ];
+  return (
+    <View style={[styles.modeToggle, { backgroundColor: t.glass, borderColor: t.line2 }]}>
+      {opts.map((o) => {
+        const on = mode === o.key;
+        return (
+          <Pressable
+            key={o.key}
+            accessibilityRole="button"
+            accessibilityLabel={`${o.label} wardrobe`}
+            accessibilityState={{ selected: on }}
+            onPress={() => onChange(o.key)}
+            style={[styles.modeSeg, on && { backgroundColor: t.glass2, borderColor: t.accent }]}
+          >
+            <Text style={[styles.modeSegTxt, { color: on ? t.ink : t.muted, fontFamily: on ? fonts.uiSemi : fonts.ui }]}>
+              {o.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+type RestoreBusy = null | 'drive' | 'text';
+
+/** A small Modal sheet that lets a returning user restore from Drive or a pasted text backup. */
+function RestoreSheet({
+  t,
+  visible,
+  onClose,
+  onRestored,
+}: {
+  t: ThemeT;
+  visible: boolean;
+  onClose: () => void;
+  onRestored: () => void;
+}) {
+  const importData = useStore((s) => s.importData);
+  const showToast = useUiStore((s) => s.showToast);
+  const [paste, setPaste] = useState('');
+  const [busy, setBusy] = useState<RestoreBusy>(null);
+  const driveOn = isDriveConfigured();
+  const anyBusy = busy !== null;
+
+  const onDrive = async () => {
+    setBusy('drive');
+    try {
+      const email = await signInToDrive();
+      if (!email) {
+        setBusy(null);
+        return; // cancelled
+      }
+      const json = await restoreFromDrive();
+      if (!json) {
+        showToast('No backup found in Drive yet');
+      } else if (importData(json)) {
+        showToast('Wardrobe restored from Drive');
+        onRestored();
+        return;
+      } else {
+        showToast('That Drive backup looked corrupted');
+      }
+    } catch (e: any) {
+      showToast(e?.message ?? "Restore didn't complete");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onText = () => {
+    if (importData(paste.trim())) {
+      setPaste('');
+      showToast('Wardrobe restored');
+      onRestored();
+    } else {
+      showToast('That backup didn’t look right');
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
+        <Pressable
+          style={[styles.sheet, { backgroundColor: t.surface, borderColor: t.line2 }]}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <View style={styles.sheetHead}>
+            <Text style={[styles.sheetTitle, { color: t.ink, fontFamily: fonts.display }]}>Restore a backup</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} hitSlop={10}>
+              <Icon name="x" size={18} color={t.muted} />
+            </Pressable>
+          </View>
+          <Text style={[styles.sheetLead, { color: t.muted, fontFamily: fonts.uiRegular }]}>
+            Returning, or reinstalled? Bring back your colours, worn history and saved looks.
+          </Text>
+
+          {driveOn && (
+            <View style={{ marginTop: 18 }}>
+              <Button
+                title={busy === 'drive' ? 'Restoring…' : 'Restore from Google Drive'}
+                onPress={onDrive}
+                disabled={anyBusy}
+                icon={
+                  busy === 'drive' ? (
+                    <ActivityIndicator size="small" color={t.onGold} />
+                  ) : (
+                    <Icon name="cloud" size={18} color={t.onGold} />
+                  )
+                }
+              />
+            </View>
+          )}
+
+          <Text style={[styles.sheetLabel, { color: t.faint, fontFamily: fonts.mono }]}>
+            {driveOn ? 'OR — PASTE A TEXT BACKUP' : 'PASTE A TEXT BACKUP'}
+          </Text>
+          <TextInput
+            value={paste}
+            onChangeText={setPaste}
+            multiline
+            editable={!anyBusy}
+            placeholder="Paste your text backup here…"
+            placeholderTextColor={t.faint}
+            style={[styles.sheetInput, { backgroundColor: t.glass, borderColor: t.line, color: t.ink, fontFamily: fonts.mono }]}
+          />
+          <View style={{ marginTop: 12 }}>
+            <Button title="Restore from text" variant="goldline" onPress={onText} disabled={!paste.trim() || anyBusy} />
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -293,5 +478,44 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  restoreLink: { marginTop: 26, alignSelf: 'center', paddingVertical: 6 },
+  restoreLinkTxt: { fontSize: 13 },
+  modeToggle: {
+    flexDirection: 'row',
+    marginTop: 20,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 3,
+    gap: 3,
+    alignSelf: 'flex-start',
+  },
+  modeSeg: {
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  modeSegTxt: { fontSize: 13, letterSpacing: 0.2 },
+  modeHint: { fontSize: 12, lineHeight: 18, marginTop: 9 },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+  },
+  sheet: { borderWidth: 1, borderRadius: 22, padding: 20 },
+  sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sheetTitle: { fontSize: 22, letterSpacing: -0.3 },
+  sheetLead: { fontSize: 13, lineHeight: 20, marginTop: 8 },
+  sheetLabel: { fontSize: 10, letterSpacing: 1.6, marginTop: 22, marginBottom: 10 },
+  sheetInput: {
+    minHeight: 90,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 13,
+    fontSize: 11.5,
+    textAlignVertical: 'top',
   },
 });

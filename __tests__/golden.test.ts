@@ -29,11 +29,18 @@ describe.each(BUCKETS)('golden: $gender $mode', ({ gender, mode }) => {
     for (let i = 1; i < uni.length; i++) expect(uni[i - 1].sc).toBeGreaterThanOrEqual(uni[i].sc);
   });
 
+  it('the per-style decks partition the universe (style filter)', () => {
+    const sizes = (['Minimal', 'Classic', 'Bold', 'Statement'] as const).map(
+      (style) => buildDeck({ tops: TOPS, bottoms: BOTTOMS, skin, style, gender, mode }).length
+    );
+    expect(sizes.reduce((a, b) => a + b, 0)).toBe(uni.length);
+  });
+
   it.each(['Minimal', 'Classic', 'Bold', 'Statement'] as const)(
     'ranked deck for %s matches the snapshot',
     (style) => {
       const deck = buildDeck({ tops: TOPS, bottoms: BOTTOMS, skin, style, gender, mode });
-      expect(deck.length).toBe(uni.length); // same membership, only re-ordered
+      deck.forEach((c) => expect(c.style).toBe(style)); // deck is filtered to this style
       expect(deck.map((c) => `${c.id}@${round(c.osc)}`)).toMatchSnapshot();
     }
   );

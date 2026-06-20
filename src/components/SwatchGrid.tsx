@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { COLORS, KEYS, shadeName, type ColorKey, type ShadeIndex } from '@/engine';
+import { COLORS, KEYS, shadeName, type ColorKey } from '@/engine';
 import { Icon } from '@/components/Icon';
+import { ShadePicker } from '@/components/ShadePicker';
 import { useStore, useActiveWardrobe } from '@/store/useStore';
 import { fonts } from '@/theme/fonts';
 import { useTheme } from '@/theme/useTheme';
@@ -10,10 +12,11 @@ interface Props {
 }
 
 /**
- * The manual colour palette. Two columns so each colour patch — and the named
- * shade chips beneath it — are large enough to tap comfortably. Tap the patch to
- * select the colour; tap the shade chips (more than one allowed) to record which
- * shades you actually own. Reads the active gender×mode wardrobe bucket.
+ * The manual colour palette. Two columns so each colour patch is large enough
+ * to tap comfortably. Tap the patch to select the colour; a selected colour
+ * shows a compact "Shades ⌄ · N" affordance that opens a floating multi-select
+ * picker (`ShadePicker`) for recording which shades you actually own. Reads the
+ * active gender×mode wardrobe bucket.
  */
 export function SwatchGrid({ slot }: Props) {
   const t = useTheme();
@@ -21,7 +24,7 @@ export function SwatchGrid({ slot }: Props) {
   const selected = slot === 'tops' ? w.tops : w.bottoms;
   const shades = slot === 'tops' ? w.shadeTops : w.shadeBottoms;
   const toggleColor = useStore((s) => s.toggleColor);
-  const toggleShade = useStore((s) => s.toggleShade);
+  const [openKey, setOpenKey] = useState<ColorKey | null>(null);
 
   return (
     <View style={styles.grid}>
@@ -30,7 +33,8 @@ export function SwatchGrid({ slot }: Props) {
         const def = COLORS[k].baseIdx;
         const picked = shades[k] ?? [def];
         const fill = COLORS[k].shades[picked[0] ?? def];
-        const count = COLORS[k].shades.length;
+        const label =
+          picked.length === 1 ? shadeName(k, picked[0]) : `${picked.length} shades`;
         return (
           <View key={k} style={styles.cellWrap}>
             <View style={[styles.swatch, { borderColor: on ? t.accent : 'transparent' }]}>
@@ -49,47 +53,31 @@ export function SwatchGrid({ slot }: Props) {
               </Pressable>
 
               {on && (
-                <View style={[styles.strip, { backgroundColor: t.bg }]}>
-                  {COLORS[k].shades.map((sh, i) => {
-                    const active = picked.includes(i as ShadeIndex);
-                    return (
-                      <Pressable
-                        key={i}
-                        accessibilityRole="button"
-                        accessibilityLabel={`${shadeName(k, i)} (shade ${i + 1} of ${count})`}
-                        accessibilityState={{ selected: active }}
-                        onPress={() => toggleShade(slot, k, i as ShadeIndex)}
-                        style={({ pressed }) => [styles.chipHit, { transform: [{ scale: pressed ? 0.9 : 1 }] }]}
-                        hitSlop={4}
-                      >
-                        <View
-                          style={[
-                            styles.chip,
-                            { backgroundColor: sh, borderColor: t.line2 },
-                            active && { borderColor: t.accent, borderWidth: 2.6 },
-                          ]}
-                        />
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              )}
-
-              {on && picked.length > 0 && (
-                <Text
-                  numberOfLines={1}
-                  style={[styles.shadeCaption, { color: t.muted, fontFamily: fonts.ui, backgroundColor: t.bg }]}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Shades for ${k}, ${picked.length} picked: ${label}`}
+                  accessibilityHint="Opens the shade picker"
+                  onPress={() => setOpenKey(k)}
+                  style={({ pressed }) => [styles.affordance, { backgroundColor: t.bg, opacity: pressed ? 0.7 : 1 }]}
                 >
-                  {picked.length === 1
-                    ? shadeName(k, picked[0])
-                    : `${picked.length} shades`}
-                </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.affordanceTxt, { color: t.muted, fontFamily: fonts.uiSemi }]}
+                  >
+                    Shades
+                  </Text>
+                  <Icon name="chevron-down" size={13} color={t.muted} />
+                  <View style={[styles.dot, { backgroundColor: t.line2 }]} />
+                  <Text style={[styles.count, { color: t.accent, fontFamily: fonts.uiBold }]}>{picked.length}</Text>
+                </Pressable>
               )}
             </View>
             <Text style={[styles.name, { color: on ? t.ink : t.muted, fontFamily: fonts.uiSemi }]}>{k}</Text>
           </View>
         );
       })}
+
+      {openKey && <ShadePicker slot={slot} colorKey={openKey} onClose={() => setOpenKey(null)} />}
     </View>
   );
 }
@@ -109,9 +97,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  strip: { flexDirection: 'row', gap: 4, paddingHorizontal: 6, paddingTop: 6 },
-  chipHit: { flex: 1, alignItems: 'stretch' },
-  chip: { height: 38, borderRadius: 7, borderWidth: 1 },
-  shadeCaption: { fontSize: 10.5, textAlign: 'center', paddingBottom: 6, paddingTop: 3, paddingHorizontal: 6 },
+  affordance: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  affordanceTxt: { fontSize: 11.5, letterSpacing: 0.2 },
+  dot: { width: 3, height: 3, borderRadius: 1.5, marginHorizontal: 1 },
+  count: { fontSize: 11.5 },
   name: { fontSize: 12, textAlign: 'center', paddingVertical: 9, paddingHorizontal: 4 },
 });

@@ -23,12 +23,13 @@ describe('comboName', () => {
 });
 
 describe('comboWhy (named-shade aware, never a skin sentence)', () => {
-  it('curated: leads with the doc why and names both shades', () => {
+  it('curated: leads with the doc why and names the owned shades', () => {
     const cur = findCurated('Light Blue', 'Navy', 'male', 'formal')!;
-    const segs = comboWhy({ t: 'Light Blue', b: 'Navy', curated: cur });
+    // no owned shade idx → base shade names (Light Blue / Navy), plus a deep-navy variant
+    const segs = comboWhy({ t: 'Light Blue', b: 'Navy', curated: cur, bottomShadeIdx: 3 });
     const text = whyText(segs);
-    expect(text).toContain('Sky Blue');
-    expect(text).toContain('Navy');
+    expect(text).toContain('Light Blue');
+    expect(text).toContain('Deep Navy'); // owned shade name, not the dropped "Sky Blue"
     expect(text).toContain(cur.why);
     expect(segs.some((s) => s.bold)).toBe(true); // shade names are bold
   });

@@ -45,6 +45,8 @@ export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
   const markHintSeen = useStore((s) => s.markSwipeHintSeen);
 
   // First-time affordance: a gentle left/right nudge so the user sees it's swipeable.
+  // It keeps playing until the user actually swipes once (marked in pan onEnd below),
+  // so a migrated/returning user who never saw it still gets the cue.
   useEffect(() => {
     if (!hintSeen) {
       tx.value = withDelay(
@@ -55,11 +57,9 @@ export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
           withSpring(0, { damping: 14, stiffness: 140 })
         )
       );
-      const id = setTimeout(markHintSeen, 1600);
-      return () => clearTimeout(id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [hintSeen]);
 
   // After the new look commits (pos changed), slide the next card in from the edge.
   const mounted = useRef(false);
@@ -84,6 +84,10 @@ export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
       }
       const goNext = e.translationX <= -THRESH || e.velocityX <= -FLICK;
       const goPrev = e.translationX >= THRESH || e.velocityX >= FLICK;
+      // First real swipe retires the nudge (not a timer), so it shows until they swipe.
+      if (goNext || goPrev) {
+        runOnJS(markHintSeen)();
+      }
       if (goNext) {
         runOnJS(hapticLight)();
         // Old card flies LEFT, then we park the incoming card off-screen RIGHT so it

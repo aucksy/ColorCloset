@@ -4,6 +4,8 @@ import {
   isAvoided,
   skinObj,
   stepRec,
+  styleCounts,
+  styleOf,
   uniStats,
   type RankedCombo,
 } from '../../src/engine';
@@ -57,18 +59,44 @@ describe('uniStats', () => {
   });
 });
 
-describe('buildDeck', () => {
-  it('re-ranks the universe by the style score (osc), best-first', () => {
-    const deck = buildDeck({
-      tops: ['White', 'Burgundy'],
-      bottoms: ['Grey', 'Navy'],
-      skin,
-      style: 'Bold',
-      gender: G,
-      mode: M,
-    });
+describe('buildDeck (style filter + diversity)', () => {
+  const tops = ['White', 'Navy', 'Olive', 'Burgundy', 'Light Blue'];
+  const bottoms = ['Navy', 'Grey', 'Charcoal', 'Khaki'];
+
+  it('returns ONLY combos of the selected style; the best card is first', () => {
+    const deck = buildDeck({ tops, bottoms, skin, style: 'Minimal', gender: G, mode: M });
     expect(deck.length).toBeGreaterThan(0);
-    for (let i = 1; i < deck.length; i++) expect(deck[i - 1].osc).toBeGreaterThanOrEqual(deck[i].osc);
+    deck.forEach((c) => expect(c.style).toBe('Minimal'));
+    // best-osc card leads (diversify keeps the top pick first, then anti-clusters)
+    const maxOsc = Math.max(...deck.map((c) => c.osc));
+    expect(deck[0].osc).toBe(maxOsc);
+  });
+
+  it('diversifies so consecutive cards avoid the same bottom where possible', () => {
+    const deck = buildDeck({ tops, bottoms, skin, style: 'Classic', gender: G, mode: M });
+    if (deck.length > 2) {
+      // with several bottoms available, no two adjacent cards should share a bottom unless forced
+      let repeats = 0;
+      for (let i = 1; i < deck.length; i++) if (deck[i].b === deck[i - 1].b) repeats++;
+      expect(repeats).toBeLessThan(deck.length - 1);
+    }
+  });
+
+  it('partitions the universe across styles (styleCounts)', () => {
+    const counts = styleCounts(tops, bottoms, skin, G, M);
+    const uni = comboUniverse(tops, bottoms, skin, G, M);
+    const total = counts.Minimal + counts.Classic + counts.Bold + counts.Statement;
+    expect(total).toBe(uni.length);
+    uni.forEach((c) => expect(['Minimal', 'Classic', 'Bold', 'Statement']).toContain(c.style));
+  });
+});
+
+describe('styleOf', () => {
+  it('classifies generative pairs into one of the four (never Neutral/Everyday)', () => {
+    expect(styleOf('White', 'Grey')).toBe('Minimal'); // both neutral
+    expect(styleOf('Olive', 'Grey')).toBe('Bold'); // one bold present
+    expect(styleOf('Olive', 'Burgundy')).toBe('Statement'); // both bold
+    expect(styleOf('Light Blue', 'Navy')).toBe('Classic'); // cool + neutral
   });
 });
 

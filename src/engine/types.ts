@@ -94,6 +94,8 @@ export interface Combo {
   t: ColorKey;
   b: ColorKey;
   sc: number;
+  /** The single style bucket this pairing belongs to (drives the Style filter + eyebrow). */
+  style: StyleName;
   /** Present iff this is a curated, ownable combo. */
   curated?: CuratedMeta;
 }

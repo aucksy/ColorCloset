@@ -12,8 +12,9 @@
  */
 import { KEYS, bottomScore } from './colors';
 import { GAP_THRESHOLD } from './constants';
-import { isAvoided, score } from './scoring';
-import type { BuySuggestion, ColorKey, Gender, Mode, SkinObj } from './types';
+import { findCurated } from './combos';
+import { isAvoided, score, styleOf } from './scoring';
+import type { BuySuggestion, ColorKey, Gender, Mode, SkinObj, StyleName } from './types';
 
 /** A colour must be at least this plausible as trousers to be suggested as a bottom. */
 const MIN_BOTTOM_SUITABILITY = 0.35;
@@ -43,13 +44,18 @@ export function gapSuggestions(
   bottoms: ColorKey[],
   skin: SkinObj | null,
   gender?: Gender,
-  mode?: Mode
+  mode?: Mode,
+  style?: StyleName | null
 ): GapResult {
   const ownT = new Set(tops);
   const ownB = new Set(bottoms);
   const ctx = { gender, mode };
   const asTops: BuySuggestion[] = [];
   const asBottoms: BuySuggestion[] = [];
+
+  // When a Style filter is active, a pairing only counts if it belongs to that style.
+  const inStyle = (t: ColorKey, b: ColorKey): boolean =>
+    !style || styleOf(t, b, gender && mode ? findCurated(t, b, gender, mode) : undefined) === style;
 
   KEYS.forEach((c) => {
     const fl = skin ? skin.flatterTops.includes(c) : false;
@@ -58,8 +64,8 @@ export function gapSuggestions(
     if (!ownB.has(c) && bottomScore(c) >= MIN_BOTTOM_SUITABILITY) {
       const pairs: ColorKey[] = [];
       tops.forEach((t) => {
-        // Never count a suppressed pairing as a reason to buy.
-        if (!isAvoided(t, c) && score(t, c, skin, undefined, ctx) >= GAP_THRESHOLD) {
+        // Never count a suppressed (or off-style) pairing as a reason to buy.
+        if (!isAvoided(t, c) && inStyle(t, c) && score(t, c, skin, undefined, ctx) >= GAP_THRESHOLD) {
           pairs.push(t);
         }
       });
@@ -69,7 +75,7 @@ export function gapSuggestions(
     if (!ownT.has(c)) {
       const pairs: ColorKey[] = [];
       bottoms.forEach((b) => {
-        if (!isAvoided(c, b) && score(c, b, skin, undefined, ctx) >= GAP_THRESHOLD) {
+        if (!isAvoided(c, b) && inStyle(c, b) && score(c, b, skin, undefined, ctx) >= GAP_THRESHOLD) {
           pairs.push(b);
         }
       });

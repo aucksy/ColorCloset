@@ -19,8 +19,6 @@ export function BuyCard({ suggestion, slot, index }: Props) {
   const motion = useMotion();
   const { shadeTops, shadeBottoms } = useActiveWardrobe();
   const { c, pairs, fl } = suggestion;
-  const shown = pairs.slice(0, 6);
-  const extra = pairs.length - shown.length;
 
   return (
     <Animated.View
@@ -47,7 +45,7 @@ export function BuyCard({ suggestion, slot, index }: Props) {
           {slot === 'bottoms' ? 'PAIRS WITH YOUR TOPS' : 'PAIRS WITH YOUR BOTTOMS'}
         </Text>
         <View style={styles.grid}>
-          {shown.map((piece) => {
+          {pairs.map((piece) => {
             const topHex = slot === 'bottoms' ? shadeHex(piece, shadeTops[piece]?.[0]) : hx(c);
             const botHex = slot === 'bottoms' ? hx(c) : shadeHex(piece, shadeBottoms[piece]?.[0]);
             return (
@@ -62,9 +60,6 @@ export function BuyCard({ suggestion, slot, index }: Props) {
               </View>
             );
           })}
-          {extra > 0 && (
-            <Text style={[styles.more, { color: t.muted, fontFamily: fonts.monoBold }]}>+{extra}</Text>
-          )}
         </View>
       </View>
     </Animated.View>
@@ -86,5 +81,4 @@ const styles = StyleSheet.create({
   item: { width: 52, alignItems: 'center', gap: 5 },
   pair: { width: 46, height: 46, borderRadius: 12, overflow: 'hidden', borderWidth: 1 },
   piece: { fontSize: 10, textAlign: 'center', maxWidth: 52 },
-  more: { fontSize: 12, alignSelf: 'center', paddingTop: 14, paddingHorizontal: 4 },
 });

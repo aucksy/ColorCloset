@@ -6,7 +6,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Circle, Line, Path, Svg } from 'react-native-svg';
-import { rgbString } from '@/engine';
+import { lumHex, rgbString } from '@/engine';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
@@ -30,6 +30,11 @@ interface Props {
 export function GarmentSilhouette({ kind, color, duration }: Props) {
   const d = kind === 'top' ? TOP_PATH : BOTTOM_PATH;
   const target = rgbString(color);
+  // Luminance-aware outline so a light fill (e.g. white) still reads on a light card.
+  const light = lumHex(color) > 0.6;
+  const outlineStroke = light ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.18)';
+  // Leg creases default to a light highlight; on a light fill that vanishes, so darken it.
+  const creaseStroke = light ? 'rgba(0,0,0,0.16)' : 'rgba(255,255,255,0.10)';
   const progress = useSharedValue(1);
   const from = useSharedValue(target);
   const to = useSharedValue(target);
@@ -49,8 +54,8 @@ export function GarmentSilhouette({ kind, color, duration }: Props) {
   return (
     <Svg width="100%" height={210} viewBox="0 0 240 230">
       <AnimatedPath d={d} animatedProps={animatedProps} />
-      {/* outline over the animated fill */}
-      <Path d={d} fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth={1.2} />
+      {/* outline over the animated fill — luminance-aware so light fills stay visible */}
+      <Path d={d} fill="none" stroke={outlineStroke} strokeWidth={1.2} />
 
       {kind === 'top' ? (
         <>
@@ -66,8 +71,8 @@ export function GarmentSilhouette({ kind, color, duration }: Props) {
         <>
           {/* waistband + leg creases → reads as formal trousers */}
           <Path d={WAISTBAND} fill="rgba(0,0,0,0.16)" />
-          <Line x1={104} y1={44} x2={106} y2={206} stroke="rgba(255,255,255,0.10)" strokeWidth={1.5} />
-          <Line x1={136} y1={44} x2={134} y2={206} stroke="rgba(255,255,255,0.10)" strokeWidth={1.5} />
+          <Line x1={104} y1={44} x2={106} y2={206} stroke={creaseStroke} strokeWidth={1.5} />
+          <Line x1={136} y1={44} x2={134} y2={206} stroke={creaseStroke} strokeWidth={1.5} />
         </>
       )}
     </Svg>

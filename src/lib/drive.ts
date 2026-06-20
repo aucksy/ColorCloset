@@ -20,6 +20,8 @@ import {
 } from '@react-native-google-signin/google-signin';
 
 const FILE_NAME = 'colorcloset-backup.json';
+const FOLDER_NAME = 'ColorCloset';
+const FOLDER_MIME = 'application/vnd.google-apps.folder';
 const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const DRIVE = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
@@ -122,9 +124,37 @@ async function api(token: string, url: string, init?: RequestInit): Promise<Resp
   return res;
 }
 
-/** Find our single backup file id (most recent), or null. */
-async function findBackupId(token: string): Promise<string | null> {
-  const q = encodeURIComponent(`name = '${FILE_NAME}' and trashed = false`);
+/**
+ * Find our dedicated "ColorCloset" Drive folder (creating it if missing) and
+ * return its id, so the backup lives in its own folder rather than loose in My
+ * Drive. drive.file scope only sees folders this app created, which is exactly
+ * what we want.
+ */
+async function ensureFolderId(token: string): Promise<string> {
+  const q = encodeURIComponent(
+    `name = '${FOLDER_NAME}' and mimeType = '${FOLDER_MIME}' and trashed = false`,
+  );
+  const url = `${DRIVE}/files?q=${q}&spaces=drive&pageSize=1&fields=files(id)`;
+  const res = await api(token, url);
+  const json = (await res.json()) as { files?: { id: string }[] };
+  const existing = json.files?.[0]?.id;
+  if (existing) return existing;
+
+  const create = await api(token, `${DRIVE}/files?fields=id`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: FOLDER_NAME, mimeType: FOLDER_MIME }),
+  });
+  const created = (await create.json()) as { id?: string };
+  if (!created.id) throw new DriveError('Couldn’t create the ColorCloset folder on Drive.');
+  return created.id;
+}
+
+/** Find our single backup file id inside the ColorCloset folder (most recent), or null. */
+async function findBackupId(token: string, folderId: string): Promise<string | null> {
+  const q = encodeURIComponent(
+    `name = '${FILE_NAME}' and '${folderId}' in parents and trashed = false`,
+  );
   const url = `${DRIVE}/files?q=${q}&spaces=drive&orderBy=modifiedTime desc&pageSize=1&fields=files(id,modifiedTime)`;
   const res = await api(token, url);
   const json = (await res.json()) as { files?: { id: string }[] };
@@ -137,7 +167,8 @@ async function findBackupId(token: string): Promise<string | null> {
  */
 export async function backupToDrive(data: string): Promise<string> {
   const token = await accessToken();
-  const existing = await findBackupId(token);
+  const folderId = await ensureFolderId(token);
+  const existing = await findBackupId(token, folderId);
 
   if (existing) {
     await api(token, `${UPLOAD}/files/${existing}?uploadType=media&fields=id`, {
@@ -147,7 +178,11 @@ export async function backupToDrive(data: string): Promise<string> {
     });
   } else {
     const boundary = 'colorcloset-backup-boundary';
-    const metadata = JSON.stringify({ name: FILE_NAME, mimeType: 'application/json' });
+    const metadata = JSON.stringify({
+      name: FILE_NAME,
+      mimeType: 'application/json',
+      parents: [folderId],
+    });
     const body =
       `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n` +
       `--${boundary}\r\nContent-Type: application/json\r\n\r\n${data}\r\n` +
@@ -164,7 +199,8 @@ export async function backupToDrive(data: string): Promise<string> {
 /** Download the backup file contents (the JSON string), or null if none exists. */
 export async function restoreFromDrive(): Promise<string | null> {
   const token = await accessToken();
-  const id = await findBackupId(token);
+  const folderId = await ensureFolderId(token);
+  const id = await findBackupId(token, folderId);
   if (!id) return null;
   const res = await api(token, `${DRIVE}/files/${id}?alt=media`);
   return res.text();

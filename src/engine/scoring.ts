@@ -16,7 +16,7 @@
  */
 import { BOLD, COOL, CORP, FAMILY, NEUTRAL, WARM, bottomScore, lum } from './colors';
 import { findCurated } from './combos';
-import type { ColorKey, Gender, Mode, SkinObj, StyleName } from './types';
+import type { ColorKey, CuratedMeta, Gender, Mode, SkinObj, StyleName } from './types';
 
 /**
  * Base-level avoid pairs (unordered) — the research doc's `combinations_to_avoid`
@@ -216,4 +216,20 @@ export function catFor(t: ColorKey, b: ColorKey, gender?: Gender, mode?: Mode): 
   if (NEUTRAL.has(t) && NEUTRAL.has(b)) return 'NEUTRAL';
   if (BOLD.has(t) || BOLD.has(b)) return 'BOLD';
   return 'EVERYDAY';
+}
+
+/**
+ * The single STYLE bucket a pairing belongs to (one of the four — never Neutral/Everyday),
+ * so the Style chips can act as a real filter and every card carries a style label.
+ *  - curated → its mapped `styleTag`.
+ *  - both bold → Statement; one bold → Bold; both neutral → Minimal; else → Classic.
+ */
+export function styleOf(t: ColorKey, b: ColorKey, curated?: CuratedMeta | null): StyleName {
+  if (curated) return curated.styleTag;
+  const tB = BOLD.has(t);
+  const bB = BOLD.has(b);
+  if (tB && bB) return 'Statement';
+  if (tB || bB) return 'Bold';
+  if (NEUTRAL.has(t) && NEUTRAL.has(b)) return 'Minimal';
+  return 'Classic';
 }
