@@ -1,23 +1,24 @@
-import { gapSuggestions, skinObj } from '../../src/engine';
+import { gapSuggestions, isAvoided, skinObj } from '../../src/engine';
 
-const skin = skinObj('medium');
+const skin = skinObj(5);
+const G = 'male';
+const M = 'formal';
 
-describe('gapSuggestions ("what to buy", threshold 0.62)', () => {
-  const { asTops, asBottoms } = gapSuggestions(['White'], ['Navy'], skin);
+describe('gapSuggestions ("what to buy")', () => {
+  const { asTops, asBottoms } = gapSuggestions(['White'], ['Navy'], skin, G, M);
 
   it('never suggests a colour with zero new looks', () => {
     [...asTops, ...asBottoms].forEach((s) => expect(s.pairs.length).toBeGreaterThan(0));
   });
 
-  it('each suggestion lists the exact existing pieces it unlocks', () => {
-    const grey = asBottoms.find((s) => s.c === 'Grey');
-    expect(grey).toBeDefined();
-    expect(grey!.pairs).toContain('White'); // White+Grey clears 0.62
+  it('never proposes an avoided pairing', () => {
+    asBottoms.forEach((s) => s.pairs.forEach((top) => expect(isAvoided(top, s.c)).toBe(false)));
+    asTops.forEach((s) => s.pairs.forEach((bottom) => expect(isAvoided(s.c, bottom)).toBe(false)));
   });
 
   it('does not suggest colours already owned in that slot', () => {
-    expect(asBottoms.find((s) => s.c === 'Navy')).toBeUndefined(); // Navy already a bottom
-    expect(asTops.find((s) => s.c === 'White')).toBeUndefined(); // White already a top
+    expect(asBottoms.find((s) => s.c === 'Navy')).toBeUndefined();
+    expect(asTops.find((s) => s.c === 'White')).toBeUndefined();
   });
 
   it('ranks by new-look count with a flatter bonus (1.5)', () => {
@@ -25,5 +26,11 @@ describe('gapSuggestions ("what to buy", threshold 0.62)', () => {
     for (let i = 1; i < asBottoms.length; i++) {
       expect(rank(asBottoms[i - 1])).toBeGreaterThanOrEqual(rank(asBottoms[i]));
     }
+  });
+
+  it('only suggests realistic trouser colours as bottoms', () => {
+    // Mustard/Purple are implausible trousers (below the suitability floor).
+    expect(asBottoms.find((s) => s.c === 'Mustard')).toBeUndefined();
+    expect(asBottoms.find((s) => s.c === 'Purple')).toBeUndefined();
   });
 });

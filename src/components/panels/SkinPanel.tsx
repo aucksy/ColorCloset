@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
-import { skinNote, type DepthId } from '@/engine';
+import { skinNote } from '@/engine';
 import { PanelShell } from '@/components/PanelShell';
 import { SkinGrid } from '@/components/SkinGrid';
 import { useStore } from '@/store/useStore';
@@ -12,10 +12,10 @@ import { useTheme } from '@/theme/useTheme';
 export function SkinPanel() {
   const t = useTheme();
   const closePanel = useUiStore((s) => s.closePanel);
-  const depth = useStore((s) => s.depth);
-  const setDepth = useStore((s) => s.setDepth);
+  const mst = useStore((s) => s.mst);
+  const setMst = useStore((s) => s.setMst);
 
-  // Show a brief "recalibrating" beat each time the depth changes, so it's clear the
+  // Show a brief "recalibrating" beat each time the skin swatch changes, so it's clear the
   // recommendations are being re-ranked (skin tone genuinely reshuffles the deck).
   const [recalKey, setRecalKey] = useState(0);
   const [recal, setRecal] = useState(false);
@@ -31,8 +31,8 @@ export function SkinPanel() {
     return () => clearTimeout(id);
   }, [recalKey]);
 
-  const onSelect = (d: DepthId) => {
-    setDepth(d);
+  const onSelect = (n: number) => {
+    setMst(n);
     setRecalKey((k) => k + 1);
   };
 
@@ -41,8 +41,8 @@ export function SkinPanel() {
   return (
     <PanelShell title="Your skin tone" onClose={closePanel}>
       <Text style={[styles.p, { color: t.muted, fontFamily: fonts.uiRegular }]}>
-        Used to rank your combinations — deeper tones lean into crisp, saturated colour; fairer tones into
-        softer contrast. It never rules a colour out.
+        Used to rank your combinations — your swatch maps to a tone tier (light, medium or deep). Deeper
+        tones lean into crisp, saturated colour; lighter tones into softer contrast. It never rules a colour out.
       </Text>
 
       {recal && (
@@ -53,10 +53,10 @@ export function SkinPanel() {
       )}
 
       <View style={{ marginTop: 14 }}>
-        <SkinGrid value={depth} onSelect={onSelect} />
+        <SkinGrid value={mst} onSelect={onSelect} />
       </View>
       <Text style={[styles.note, { color: t.muted, borderLeftColor: t.accent, fontFamily: fonts.uiRegular }]}>
-        {skinNote(depth ?? 'medium')}
+        {skinNote(mst)}
       </Text>
     </PanelShell>
   );

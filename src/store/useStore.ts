@@ -1,19 +1,28 @@
 /**
- * The single app store (Zustand + persist). The session slice (deck position /
- * current pairing) is transient and partialized out of persistence. Browsing is
- * swipe-only; the deck excludes any combos the user marked "not for me".
+ * The single app store (Zustand + persist). v2 multi-wardrobe model: a user has a
+ * fixed GENDER (chosen at onboarding) and toggles MODE (formal/casual) in the sidebar.
+ * Wardrobe DATA + history (tops/bottoms/shades/worn/dismissed/saved/lastPickDay) is
+ * scoped per `${gender}-${mode}` bucket; every section reads the ACTIVE bucket. The
+ * session slice (deck position / current pairing) is transient and partialized out.
+ * Skin tone is a single Monk-Skin-Tone swatch (1..10) collapsed to a tier by the engine.
  */
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import {
+  COLORS,
   KEYS,
+  STYLES,
   buildDeck,
-  nameFor,
+  comboName,
+  findCurated,
+  mstFromLegacyLabel,
   shadeHex,
   skinObj,
   stepRec,
+  type BucketKey,
   type ColorKey,
-  type DepthId,
+  type Gender,
+  type Mode,
   type ShadeIndex,
   type StyleName,
 } from '@/engine';
@@ -28,6 +37,13 @@ export interface NotifySettings {
   days: number[];
 }
 
+/** Google Drive backup state. `email` is null when signed out. */
+export interface DriveState {
+  email: string | null;
+  lastBackup: string | null; // ISO timestamp of the last successful upload
+  auto: boolean; // auto-back up after wardrobe changes
+}
+
 export interface SavedLook {
   id: number;
   t: ColorKey;
@@ -39,10 +55,8 @@ export interface SavedLook {
   date: string;
 }
 
-type Slot = 'tops' | 'bottoms';
-
-interface PersistedState {
-  depth: DepthId | null;
+/** One gender×mode wardrobe: owned colours + their shades, plus this bucket's history. */
+export interface Wardrobe {
   tops: ColorKey[];
   bottoms: ColorKey[];
   shadeTops: Record<ColorKey, ShadeIndex[]>;
@@ -50,12 +64,24 @@ interface PersistedState {
   worn: Record<string, string>;
   dismissed: Record<string, boolean>; // combos the user marked "not for me"
   saved: SavedLook[];
+  lastPickDay: string; // yyyy-mm-dd the "today's pick" was last seeded (per bucket)
+}
+
+type Slot = 'tops' | 'bottoms';
+
+interface PersistedState {
+  gender: Gender | null; // profile-level, chosen once at onboarding
+  mode: Mode; // active mode (sidebar toggle)
+  mst: number | null; // skin swatch 1..10 (engine derives the tier)
+  wardrobes: Record<BucketKey, Wardrobe>; // all 4 keys always present
+  pendingWardrobe: Wardrobe | null; // migration holding pen until gender is chosen
   theme: 'dark' | 'light';
   style: StyleName;
   swipeHintSeen: boolean;
+  coachSeen: boolean; // the double-tap-to-save coachmark
   notify: NotifySettings;
-  lastPickDay: string; // yyyy-mm-dd the "today's pick" was last seeded
   setupComplete: boolean;
+  drive: DriveState;
 }
 
 interface SessionState {
@@ -66,7 +92,9 @@ interface SessionState {
 }
 
 interface Actions {
-  setDepth: (d: DepthId) => void;
+  setGender: (g: Gender) => void;
+  setMode: (m: Mode) => void;
+  setMst: (n: number) => void;
   toggleColor: (slot: Slot, key: ColorKey) => void;
   setColors: (slot: Slot, colors: ColorKey[]) => void;
   toggleShade: (slot: Slot, key: ColorKey, idx: ShadeIndex) => void;
@@ -84,6 +112,7 @@ interface Actions {
   // controls
   setStyle: (s: StyleName) => void;
   markSwipeHintSeen: () => void;
+  markCoachSeen: () => void;
   setNotify: (patch: Partial<NotifySettings>) => void;
   // saved / worn
   saveCurrent: () => void;
@@ -97,14 +126,17 @@ interface Actions {
   setHasHydrated: (v: boolean) => void;
   exportData: () => string;
   importData: (json: string) => boolean;
+  // google drive
+  setDriveEmail: (email: string | null) => void;
+  setDriveLastBackup: (iso: string) => void;
+  setDriveAuto: (auto: boolean) => void;
 }
 
 export type Store = PersistedState & SessionState & Actions;
 
-const SESSION_DEFAULTS: SessionState = { current: null, currentName: '', deckPos: -1, _hasHydrated: false };
+export const BUCKETS: BucketKey[] = ['male-formal', 'male-casual', 'female-formal', 'female-casual'];
 
-const PERSISTED_DEFAULTS: PersistedState = {
-  depth: null,
+const emptyWardrobe = (): Wardrobe => ({
   tops: [],
   bottoms: [],
   shadeTops: {},
@@ -112,39 +144,125 @@ const PERSISTED_DEFAULTS: PersistedState = {
   worn: {},
   dismissed: {},
   saved: [],
+  lastPickDay: '',
+});
+
+const emptyWardrobes = (): Record<BucketKey, Wardrobe> =>
+  BUCKETS.reduce((acc, k) => {
+    acc[k] = emptyWardrobe();
+    return acc;
+  }, {} as Record<BucketKey, Wardrobe>);
+
+/** A stable empty wardrobe for selectors when no gender is chosen yet (pre-onboarding). */
+const EMPTY_WARDROBE: Wardrobe = emptyWardrobe();
+
+const SESSION_DEFAULTS: SessionState = { current: null, currentName: '', deckPos: -1, _hasHydrated: false };
+
+const PERSISTED_DEFAULTS: PersistedState = {
+  gender: null,
+  mode: 'formal',
+  mst: null,
+  wardrobes: emptyWardrobes(),
+  pendingWardrobe: null,
   theme: 'dark',
   style: 'Minimal',
   swipeHintSeen: false,
+  coachSeen: false,
   notify: { enabled: false, hour: 9, minute: 0, days: [1, 2, 3, 4, 5, 6, 7] },
-  lastPickDay: '',
   setupComplete: false,
+  drive: { email: null, lastBackup: null, auto: false },
 };
 
-// Deterministic outfit name per combo, so revisiting a look never re-randomises it.
-const hashId = (s: string) => {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
+/** The active bucket key, or null before a gender is chosen. */
+const activeKey = (s: { gender: Gender | null; mode: Mode }): BucketKey | null =>
+  s.gender ? (`${s.gender}-${s.mode}` as BucketKey) : null;
+
+/** The active wardrobe (or a stable empty one when no gender is set yet). */
+const aw = (s: { gender: Gender | null; mode: Mode; wardrobes: Record<BucketKey, Wardrobe> }): Wardrobe => {
+  const key = activeKey(s);
+  return key ? s.wardrobes[key] ?? EMPTY_WARDROBE : EMPTY_WARDROBE;
 };
-const seededName = (t: ColorKey, b: ColorKey, style: StyleName) => {
-  let seed = hashId(`${t}|${b}`);
-  const rng = () => {
-    seed = (seed + 0x6d2b79f5) >>> 0;
-    let x = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
-    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+
+/** Immutable patch of the ACTIVE wardrobe; no-op (empty patch) when no gender is set. */
+const setAW = (s: Store, patch: Partial<Wardrobe>): Partial<Store> => {
+  const key = activeKey(s);
+  if (!key) return {};
+  const cur = s.wardrobes[key] ?? emptyWardrobe();
+  return { wardrobes: { ...s.wardrobes, [key]: { ...cur, ...patch } } };
+};
+
+/**
+ * A stable name for a pairing in the active gender×mode (curated → its mood). We pass
+ * NO rng: comboName seeds its own generative pick deterministically from `${t}|${b}`, so
+ * every call site that uses `comboName(t, b, curated)` — the card, saved looks, AND the
+ * rotation list — lands on the identical name (no two competing RNG streams).
+ */
+const nameFor = (s: Store, t: ColorKey, b: ColorKey): string => {
+  const cur = s.gender ? findCurated(t, b, s.gender, s.mode) : null;
+  return comboName(t, b, cur);
+};
+
+/** The browsable deck for the active bucket — excludes "not for me" combos. */
+const deckFor = (s: Store) => {
+  const w = aw(s);
+  return buildDeck({
+    tops: w.tops,
+    bottoms: w.bottoms,
+    skin: skinObj(s.mst),
+    style: s.style,
+    gender: s.gender,
+    mode: s.mode,
+  }).filter((c) => !w.dismissed[c.id]);
+};
+
+const isStyle = (v: unknown): v is StyleName => STYLES.includes(v as StyleName);
+const isMode = (v: unknown): v is Mode => v === 'formal' || v === 'casual';
+
+/** Sanitise an arbitrary object into a valid Wardrobe (validates colour keys, Maroon→Burgundy). */
+const sanitizeWardrobe = (raw: any): Wardrobe => {
+  const mapKey = (k: string): string => (k === 'Maroon' ? 'Burgundy' : k);
+  const validList = (a: unknown): ColorKey[] => {
+    if (!Array.isArray(a)) return [];
+    const seen = new Set<ColorKey>();
+    a.forEach((k) => {
+      const m = mapKey(k as string);
+      if (KEYS.includes(m)) seen.add(m);
+    });
+    return KEYS.filter((k) => seen.has(k));
   };
-  return nameFor(t, b, style, rng);
+  const tops = validList(raw?.tops);
+  const bottoms = validList(raw?.bottoms);
+  const validShades = (m: any, owned: ColorKey[]): Record<ColorKey, ShadeIndex[]> => {
+    const out: Record<ColorKey, ShadeIndex[]> = {};
+    owned.forEach((k) => {
+      const v = m?.[k] ?? m?.[k === 'Burgundy' ? 'Maroon' : k];
+      const arr = Array.isArray(v) ? (v as number[]).filter((i) => Number.isInteger(i) && i >= 0 && i < COLORS[k].shades.length) : [];
+      out[k] = (arr.length ? arr : [COLORS[k].baseIdx]) as ShadeIndex[];
+    });
+    return out;
+  };
+  const remapId = (id: string) => id.split('|').map(mapKey).join('|');
+  const remapMap = <V,>(m: any): Record<string, V> => {
+    const out: Record<string, V> = {};
+    if (m && typeof m === 'object') Object.entries(m).forEach(([id, v]) => (out[remapId(id)] = v as V));
+    return out;
+  };
+  const saved: SavedLook[] = Array.isArray(raw?.saved)
+    ? raw.saved
+        .filter((x: any) => x && KEYS.includes(mapKey(x.t)) && KEYS.includes(mapKey(x.b)))
+        .map((x: any) => ({ ...x, t: mapKey(x.t), b: mapKey(x.b) }))
+    : [];
+  return {
+    tops,
+    bottoms,
+    shadeTops: validShades(raw?.shadeTops, tops),
+    shadeBottoms: validShades(raw?.shadeBottoms, bottoms),
+    worn: remapMap<string>(raw?.worn),
+    dismissed: remapMap<boolean>(raw?.dismissed),
+    saved,
+    lastPickDay: typeof raw?.lastPickDay === 'string' ? raw.lastPickDay : '',
+  };
 };
-
-/** The browsable deck for the current state — excludes "not for me" combos. */
-const deckFor = (s: Store) =>
-  buildDeck({ tops: s.tops, bottoms: s.bottoms, skin: skinObj(s.depth), style: s.style }).filter(
-    (c) => !s.dismissed[c.id]
-  );
 
 export const useStore = create<Store>()(
   persist(
@@ -152,52 +270,72 @@ export const useStore = create<Store>()(
       ...PERSISTED_DEFAULTS,
       ...SESSION_DEFAULTS,
 
-      setDepth: (d) => {
-        set({ depth: d });
+      setGender: (g) => {
+        const s = get();
+        let wardrobes = s.wardrobes;
+        // First time we learn the gender, drop any migration holding-pen into formal.
+        if (s.pendingWardrobe) {
+          wardrobes = { ...wardrobes, [`${g}-formal` as BucketKey]: s.pendingWardrobe };
+        }
+        set({ gender: g, wardrobes, pendingWardrobe: null });
+        if (s.setupComplete) get().regenerate();
+      },
+
+      setMode: (m) => {
+        if (get().mode === m) return;
+        set({ mode: m });
+        get().regenerate();
+      },
+
+      setMst: (n) => {
+        set({ mst: n });
         if (get().setupComplete) get().regenerate();
       },
 
       toggleColor: (slot, key) => {
         const s = get();
-        const arr = slot === 'tops' ? s.tops : s.bottoms;
+        const w = aw(s);
+        const arr = slot === 'tops' ? w.tops : w.bottoms;
         const setK = new Set(arr);
         const adding = !setK.has(key);
         if (adding) setK.add(key);
         else setK.delete(key);
         const next = KEYS.filter((k) => setK.has(k));
         const shadeField = slot === 'tops' ? 'shadeTops' : 'shadeBottoms';
-        const shades = { ...s[shadeField] };
-        if (adding && shades[key] == null) shades[key] = [2];
-        set({ [slot]: next, [shadeField]: shades } as Partial<Store>);
+        const shades = { ...w[shadeField] };
+        if (adding && shades[key] == null) shades[key] = [COLORS[key].baseIdx as ShadeIndex];
+        set(setAW(s, { [slot]: next, [shadeField]: shades } as Partial<Wardrobe>));
       },
 
       setColors: (slot, colors) => {
         const s = get();
+        const w = aw(s);
         const setK = new Set(colors);
         const next = KEYS.filter((k) => setK.has(k));
         const shadeField = slot === 'tops' ? 'shadeTops' : 'shadeBottoms';
-        const shades = { ...s[shadeField] };
+        const shades = { ...w[shadeField] };
         next.forEach((k) => {
-          if (shades[k] == null) shades[k] = [2];
+          if (shades[k] == null) shades[k] = [COLORS[k].baseIdx as ShadeIndex];
         });
-        set({ [slot]: next, [shadeField]: shades } as Partial<Store>);
+        set(setAW(s, { [slot]: next, [shadeField]: shades } as Partial<Wardrobe>));
       },
 
       toggleShade: (slot, key, idx) => {
         const s = get();
+        const w = aw(s);
         const shadeField = slot === 'tops' ? 'shadeTops' : 'shadeBottoms';
-        const arr = slot === 'tops' ? s.tops : s.bottoms;
+        const arr = slot === 'tops' ? w.tops : w.bottoms;
         const owned = arr.includes(key);
-        const cur = s[shadeField][key] ?? [];
+        const cur = w[shadeField][key] ?? [];
         let nextShades: ShadeIndex[];
         if (!owned) nextShades = [idx];
         else if (cur.includes(idx)) {
           nextShades = cur.filter((i) => i !== idx);
           if (nextShades.length === 0) nextShades = [idx];
         } else nextShades = [...cur, idx].sort((a, b) => a - b) as ShadeIndex[];
-        const shades = { ...s[shadeField], [key]: nextShades };
+        const shades = { ...w[shadeField], [key]: nextShades };
         const next = owned ? arr : KEYS.filter((k) => arr.includes(k) || k === key);
-        set({ [shadeField]: shades, [slot]: next } as Partial<Store>);
+        set(setAW(s, { [shadeField]: shades, [slot]: next } as Partial<Wardrobe>));
       },
 
       regenerate: () => {
@@ -208,12 +346,12 @@ export const useStore = create<Store>()(
       another: () => {
         const s = get();
         const deck = deckFor(s);
-        const r = stepRec(deck, s.deckPos, s.worn);
+        const r = stepRec(deck, s.deckPos, aw(s).worn);
         if (!r) {
           set({ current: null, currentName: '', deckPos: -1 });
           return false;
         }
-        set({ current: { t: r.pick.t, b: r.pick.b }, currentName: seededName(r.pick.t, r.pick.b, s.style), deckPos: r.pos });
+        set({ current: { t: r.pick.t, b: r.pick.b }, currentName: nameFor(s, r.pick.t, r.pick.b), deckPos: r.pos });
         return r.roundDone;
       },
 
@@ -224,7 +362,7 @@ export const useStore = create<Store>()(
         if (!deck.length) return;
         const pos = (s.deckPos + 1) % deck.length;
         const pick = deck[pos];
-        set({ current: { t: pick.t, b: pick.b }, currentName: seededName(pick.t, pick.b, s.style), deckPos: pos });
+        set({ current: { t: pick.t, b: pick.b }, currentName: nameFor(s, pick.t, pick.b), deckPos: pos });
       },
       prev: () => {
         const s = get();
@@ -233,7 +371,7 @@ export const useStore = create<Store>()(
         const n = deck.length;
         const pos = (((s.deckPos === -1 ? 0 : s.deckPos) - 1) % n + n) % n;
         const pick = deck[pos];
-        set({ current: { t: pick.t, b: pick.b }, currentName: seededName(pick.t, pick.b, s.style), deckPos: pos });
+        set({ current: { t: pick.t, b: pick.b }, currentName: nameFor(s, pick.t, pick.b), deckPos: pos });
       },
       goToIndex: (i) => {
         const s = get();
@@ -241,14 +379,15 @@ export const useStore = create<Store>()(
         if (!deck.length) return;
         const pos = ((i % deck.length) + deck.length) % deck.length;
         const pick = deck[pos];
-        set({ current: { t: pick.t, b: pick.b }, currentName: seededName(pick.t, pick.b, s.style), deckPos: pos });
+        set({ current: { t: pick.t, b: pick.b }, currentName: nameFor(s, pick.t, pick.b), deckPos: pos });
       },
 
       markWorn: () => {
         const s = get();
         if (!s.current) return;
         const id = s.current.t + '|' + s.current.b;
-        set({ worn: { ...s.worn, [id]: todayStr() } });
+        const w = aw(s);
+        set(setAW(s, { worn: { ...w.worn, [id]: todayStr() } }));
         get().next();
       },
 
@@ -256,57 +395,68 @@ export const useStore = create<Store>()(
         const s = get();
         if (!s.current) return;
         const id = s.current.t + '|' + s.current.b;
-        const dismissed = { ...s.dismissed, [id]: true };
+        const w = aw(s);
+        const dismissed = { ...w.dismissed, [id]: true };
+        const patch = setAW(s, { dismissed });
         // Rebuild the deck without this combo; the same index now points to the next one.
-        const deck = buildDeck({ tops: s.tops, bottoms: s.bottoms, skin: skinObj(s.depth), style: s.style }).filter(
-          (c) => !dismissed[c.id]
-        );
+        const deck = buildDeck({
+          tops: w.tops,
+          bottoms: w.bottoms,
+          skin: skinObj(s.mst),
+          style: s.style,
+          gender: s.gender,
+          mode: s.mode,
+        }).filter((c) => !dismissed[c.id]);
         if (!deck.length) {
-          set({ dismissed, current: null, currentName: '', deckPos: -1 });
+          set({ ...patch, current: null, currentName: '', deckPos: -1 });
           return;
         }
         const pos = Math.min(s.deckPos < 0 ? 0 : s.deckPos, deck.length - 1);
         const pick = deck[pos];
-        set({ dismissed, current: { t: pick.t, b: pick.b }, currentName: seededName(pick.t, pick.b, s.style), deckPos: pos });
+        set({ ...patch, current: { t: pick.t, b: pick.b }, currentName: nameFor(s, pick.t, pick.b), deckPos: pos });
       },
       restoreDismissed: (id) => {
-        const d = { ...get().dismissed };
+        const s = get();
+        const w = aw(s);
+        const d = { ...w.dismissed };
         delete d[id];
-        set({ dismissed: d });
+        set(setAW(s, { dismissed: d }));
       },
 
       loadCombo: (t, b) => {
         const s = get();
         const pos = deckFor(s).findIndex((c) => c.t === t && c.b === b);
-        set({ current: { t, b }, currentName: seededName(t, b, s.style), deckPos: pos });
+        set({ current: { t, b }, currentName: nameFor(s, t, b), deckPos: pos });
       },
-      setLastPickDay: (d) => set({ lastPickDay: d }),
+      setLastPickDay: (d) => set(setAW(get(), { lastPickDay: d })),
 
       setStyle: (st) => {
         set({ style: st });
         get().regenerate();
       },
       markSwipeHintSeen: () => set({ swipeHintSeen: true }),
+      markCoachSeen: () => set({ coachSeen: true }),
       setNotify: (patch) => set({ notify: { ...get().notify, ...patch } }),
 
       saveCurrent: () => {
         const s = get();
         if (!s.current) return;
         const { t, b } = s.current;
+        const w = aw(s);
         const item: SavedLook = {
           id: Date.now(),
           t,
           b,
-          th: shadeHex(t, s.shadeTops[t]?.[0]),
-          bh: shadeHex(b, s.shadeBottoms[b]?.[0]),
-          name: s.currentName || seededName(t, b, s.style),
+          th: shadeHex(t, w.shadeTops[t]?.[0]),
+          bh: shadeHex(b, w.shadeBottoms[b]?.[0]),
+          name: s.currentName || nameFor(s, t, b),
           style: s.style,
           date: todayStr(),
         };
-        set({ saved: [item, ...s.saved] });
+        set(setAW(s, { saved: [item, ...w.saved] }));
       },
-      deleteSaved: (id) => set({ saved: get().saved.filter((x) => x.id !== id) }),
-      clearWorn: () => set({ worn: {} }),
+      deleteSaved: (id) => set(setAW(get(), { saved: aw(get()).saved.filter((x) => x.id !== id) })),
+      clearWorn: () => set(setAW(get(), { worn: {} })),
 
       setTheme: (t) => set({ theme: t }),
       toggleTheme: () => set({ theme: get().theme === 'dark' ? 'light' : 'dark' }),
@@ -321,7 +471,9 @@ export const useStore = create<Store>()(
           _hasHydrated: true,
           theme: s.theme, // keep preferences through a wardrobe reset
           swipeHintSeen: s.swipeHintSeen,
+          coachSeen: s.coachSeen,
           notify: s.notify,
+          drive: s.drive, // keep the Drive session/settings; only wardrobe data is cleared
         });
       },
 
@@ -329,48 +481,76 @@ export const useStore = create<Store>()(
         const s = get();
         return JSON.stringify({
           app: 'colorcloset',
-          v: 4,
-          depth: s.depth,
-          tops: s.tops,
-          bottoms: s.bottoms,
-          shadeTops: s.shadeTops,
-          shadeBottoms: s.shadeBottoms,
-          worn: s.worn,
-          dismissed: s.dismissed,
-          saved: s.saved,
-          theme: s.theme,
+          v: 6,
+          gender: s.gender,
+          mode: s.mode,
+          mst: s.mst,
           style: s.style,
+          theme: s.theme,
           notify: s.notify,
           setupComplete: s.setupComplete,
+          wardrobes: s.wardrobes,
         });
       },
+      setDriveEmail: (email) => set({ drive: { ...get().drive, email } }),
+      setDriveLastBackup: (iso) => set({ drive: { ...get().drive, lastBackup: iso } }),
+      setDriveAuto: (auto) => set({ drive: { ...get().drive, auto } }),
+
       importData: (json) => {
         try {
           const p = JSON.parse(json);
-          if (!p || typeof p !== 'object' || !Array.isArray(p.tops) || !Array.isArray(p.bottoms)) return false;
-          // Only accept real palette colours — a garbage key would crash the engine.
-          const valid = (a: unknown[]): ColorKey[] => a.filter((k): k is ColorKey => KEYS.includes(k as ColorKey));
-          const tops = valid(p.tops);
-          const bottoms = valid(p.bottoms);
-          if (!tops.length || !bottoms.length) return false;
-          set({
-            depth: p.depth ?? null,
-            tops,
-            bottoms,
-            shadeTops: p.shadeTops ?? {},
-            shadeBottoms: p.shadeBottoms ?? {},
-            worn: p.worn ?? {},
-            dismissed: p.dismissed ?? {},
-            saved: Array.isArray(p.saved) ? p.saved : [],
-            theme: p.theme === 'light' ? 'light' : 'dark',
-            style: p.style ?? 'Minimal',
-            notify: p.notify ?? PERSISTED_DEFAULTS.notify,
-            setupComplete: !!p.setupComplete,
-            ...SESSION_DEFAULTS,
-            _hasHydrated: true,
-          });
-          get().regenerate();
-          return true;
+          if (!p || typeof p !== 'object') return false;
+
+          // ---- v6 multi-wardrobe backup ----
+          if ((p.v ?? 0) >= 6 && p.wardrobes && typeof p.wardrobes === 'object') {
+            const wardrobes = emptyWardrobes();
+            BUCKETS.forEach((k) => {
+              if (p.wardrobes[k]) wardrobes[k] = sanitizeWardrobe(p.wardrobes[k]);
+            });
+            const hasAny = BUCKETS.some((k) => wardrobes[k].tops.length || wardrobes[k].bottoms.length);
+            if (!hasAny) return false;
+            set({
+              gender: p.gender === 'male' || p.gender === 'female' ? p.gender : null,
+              mode: isMode(p.mode) ? p.mode : 'formal',
+              mst: typeof p.mst === 'number' ? p.mst : null,
+              wardrobes,
+              pendingWardrobe: null,
+              style: isStyle(p.style) ? p.style : 'Minimal',
+              theme: p.theme === 'light' ? 'light' : 'dark',
+              notify: p.notify ?? PERSISTED_DEFAULTS.notify,
+              setupComplete: !!p.setupComplete,
+              ...SESSION_DEFAULTS,
+              _hasHydrated: true,
+            });
+            get().regenerate();
+            return true;
+          }
+
+          // ---- legacy v≤5 flat backup → fold into pending / active gender's formal bucket ----
+          if (Array.isArray(p.tops) || Array.isArray(p.bottoms)) {
+            const folded = sanitizeWardrobe(p);
+            if (!folded.tops.length && !folded.bottoms.length) return false;
+            const s = get();
+            const wardrobes = { ...s.wardrobes };
+            let pending = s.pendingWardrobe;
+            if (s.gender) wardrobes[`${s.gender}-formal` as BucketKey] = folded;
+            else pending = folded;
+            set({
+              wardrobes,
+              pendingWardrobe: pending,
+              mode: 'formal',
+              mst: p.depth ? mstFromLegacyLabel(p.depth) : s.mst,
+              style: isStyle(p.style) ? p.style : s.style,
+              theme: p.theme === 'light' ? 'light' : 'dark',
+              notify: p.notify ?? s.notify,
+              setupComplete: s.gender ? true : s.setupComplete,
+              ...SESSION_DEFAULTS,
+              _hasHydrated: true,
+            });
+            get().regenerate();
+            return true;
+          }
+          return false;
         } catch {
           return false;
         }
@@ -378,10 +558,11 @@ export const useStore = create<Store>()(
     }),
     {
       name: 'colorcloset',
-      version: 4,
+      version: 6,
       storage: createJSONStorage(() => activeStorage),
       migrate: (persisted: any, version) => {
-        if (persisted && version < 2) {
+        if (!persisted) return persisted;
+        if (version < 2) {
           const toArr = (m: Record<string, unknown> | undefined) => {
             const out: Record<string, ShadeIndex[]> = {};
             Object.entries(m ?? {}).forEach(([k, v]) => {
@@ -392,23 +573,51 @@ export const useStore = create<Store>()(
           persisted.shadeTops = toArr(persisted.shadeTops);
           persisted.shadeBottoms = toArr(persisted.shadeBottoms);
         }
+        // v5 (flat wardrobe) → v6 (gender×mode buckets). Gender is unknown at migration:
+        // fold the old wardrobe into the holding pen; the gender micro-step lands it in
+        // `${gender}-formal`. Old shade indices referenced an algorithmic strip, not the
+        // named vocab, so they're reset to each colour's display-default shade.
+        if (version < 6) {
+          const folded = sanitizeWardrobe(persisted);
+          // Old shade indices referenced an algorithmic light→dark strip, NOT the named
+          // vocab (different order; Beige now has 6 shades), so a preserved index would
+          // point at the wrong named shade. Reset each owned colour to its display default.
+          folded.shadeTops = Object.fromEntries(
+            folded.tops.map((k) => [k, [COLORS[k].baseIdx as ShadeIndex]])
+          );
+          folded.shadeBottoms = Object.fromEntries(
+            folded.bottoms.map((k) => [k, [COLORS[k].baseIdx as ShadeIndex]])
+          );
+          return {
+            gender: null,
+            mode: 'formal',
+            mst: persisted.depth ? mstFromLegacyLabel(persisted.depth) : null,
+            wardrobes: emptyWardrobes(),
+            pendingWardrobe: folded.tops.length || folded.bottoms.length ? folded : null,
+            theme: persisted.theme === 'light' ? 'light' : 'dark',
+            style: isStyle(persisted.style) ? persisted.style : 'Minimal',
+            swipeHintSeen: !!persisted.swipeHintSeen,
+            coachSeen: false,
+            notify: persisted.notify ?? PERSISTED_DEFAULTS.notify,
+            setupComplete: !!persisted.setupComplete,
+            drive: persisted.drive ?? PERSISTED_DEFAULTS.drive,
+          } as PersistedState;
+        }
         return persisted;
       },
       partialize: (s): PersistedState => ({
-        depth: s.depth,
-        tops: s.tops,
-        bottoms: s.bottoms,
-        shadeTops: s.shadeTops,
-        shadeBottoms: s.shadeBottoms,
-        worn: s.worn,
-        dismissed: s.dismissed,
-        saved: s.saved,
+        gender: s.gender,
+        mode: s.mode,
+        mst: s.mst,
+        wardrobes: s.wardrobes,
+        pendingWardrobe: s.pendingWardrobe,
         theme: s.theme,
         style: s.style,
         swipeHintSeen: s.swipeHintSeen,
+        coachSeen: s.coachSeen,
         notify: s.notify,
-        lastPickDay: s.lastPickDay,
         setupComplete: s.setupComplete,
+        drive: s.drive,
       }),
       onRehydrateStorage: () => () => {
         useStore.setState({ _hasHydrated: true });
@@ -419,3 +628,7 @@ export const useStore = create<Store>()(
 
 /** True once persisted state has loaded — gate the UI on this to avoid flicker. */
 export const useHydrated = () => useStore((s) => s._hasHydrated);
+
+/** The active wardrobe selector for components (recomputed on gender/mode/wardrobes change). */
+export const useActiveWardrobe = (): Wardrobe =>
+  useStore((s) => (s.gender ? s.wardrobes[`${s.gender}-${s.mode}` as BucketKey] ?? EMPTY_WARDROBE : EMPTY_WARDROBE));

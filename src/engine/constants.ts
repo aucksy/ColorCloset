@@ -1,72 +1,56 @@
 /**
- * Engine constants: occasions, styles, curated exemplar pairings, thresholds.
- * Ported verbatim from the prototype (lines ~655-682, 9.6 / 9.9 / Appendix B).
+ * Engine constants: style/mode/gender vocabularies, display labels, ranking
+ * thresholds, and the curated source list. Pure data — no logic, no platform
+ * imports. Type names are pulled from './types' (spec §11).
  */
-import type { StyleName } from './types';
+import type { StyleName, Mode, Gender } from './types';
 
+/** The four wardrobe styles, in onboarding/segmented display order. */
 export const STYLES: StyleName[] = ['Minimal', 'Classic', 'Bold', 'Statement'];
 
-/**
- * Curated exemplar pairings per style (top/bottom interchangeable), retuned with an
- * India sensibility (jewel + warm-earth combinations, gold/neutral-bridged), across
- * the 18 colours (Brown and Maroon are now first-class entries). Remaining research
- * suggestions still map to the closest colour (Teal/Emerald→Forest Green,
- * Marigold→Mustard, Rani Pink→Purple).
- */
-export const GOOD: Record<StyleName, [string, string][]> = {
-  Minimal: [
-    ['White', 'Navy'],
-    ['Cream', 'Olive'],
-    ['Beige', 'Khaki'],
-    ['Grey', 'Charcoal'],
-    ['Light Blue', 'Navy'],
-    ['White', 'Charcoal'],
-    ['Brown', 'Beige'],
-  ],
-  Classic: [
-    ['White', 'Navy'],
-    ['Light Blue', 'Charcoal'],
-    ['Cream', 'Forest Green'],
-    ['White', 'Burgundy'],
-    ['Beige', 'Navy'],
-    ['Grey', 'Navy'],
-    ['Brown', 'Cream'],
-    ['Maroon', 'Grey'],
-  ],
-  Bold: [
-    ['Mustard', 'Navy'],
-    ['Rust', 'Forest Green'],
-    ['Burgundy', 'Grey'],
-    ['Blue', 'Mustard'],
-    ['Olive', 'Beige'],
-    ['Purple', 'Mustard'],
-    ['Maroon', 'Grey'],
-    ['Brown', 'Olive'],
-  ],
-  Statement: [
-    ['Purple', 'Mustard'],
-    ['Mustard', 'Burgundy'],
-    ['Forest Green', 'Rust'],
-    ['Blue', 'Rust'],
-    ['Purple', 'Grey'],
-    ['Burgundy', 'Beige'],
-    ['Maroon', 'Mustard'],
-    ['Brown', 'Mustard'],
-  ],
-};
+/** The two wardrobe modes (one active at a time, toggled in the sidebar). */
+export const MODES: Mode[] = ['formal', 'casual'];
 
-/**
- * Union of all curated style pairings, keyed "top|bottom" (single order, as in the
- * prototype). harmony()/catFor() check both orders explicitly.
- */
-export const GOODSET: Set<string> = (() => {
-  const s = new Set<string>();
-  (Object.values(GOOD) as [string, string][][]).forEach((pairs) =>
-    pairs.forEach(([a, b]) => s.add(a + '|' + b))
-  );
-  return s;
-})();
+/** The two profile-level genders (chosen once at onboarding). */
+export const GENDERS: Gender[] = ['male', 'female'];
 
-/** Tunable thresholds (§9.9). Exact prototype values — the starting tuning. */
+/** Inclusion threshold for the combo universe (spec §8). Below this, a non-curated
+ *  pair is dropped; curated pairs are always included regardless of score. */
 export const UNIVERSE_THRESHOLD = 0.55;
+
+/** Minimum score for a colour to be offered as a gap suggestion (spec §9). */
 export const GAP_THRESHOLD = 0.62;
+
+/** Mode → user-facing label (sidebar toggle, eyebrows). */
+export const MODE_LABEL: Record<Mode, string> = { formal: 'Formal', casual: 'Casual' };
+
+/** Gender → user-facing label (brand subline, onboarding cards). */
+export const GENDER_LABEL: Record<Gender, string> = { male: 'Men', female: 'Women' };
+
+/**
+ * The five most authentic / trustworthy sources behind the colour logic, surfaced
+ * in the "Colour science sources" panel (spec §13.5). Transcribed from the research
+ * doc's "TOP 5 MOST AUTHENTIC / TRUSTWORTHY SOURCES" section — one short note each.
+ */
+export const SOURCES: { name: string; note: string }[] = [
+  {
+    name: 'Pantone Color Institute',
+    note: 'The globally recognised colour authority — sets the industry standard for colour naming and forecasting.',
+  },
+  {
+    name: 'Monk Skin Tone Scale (Dr. Ellis Monk, Harvard, with Google)',
+    note: 'Open-source, peer-reviewed, inclusive skin-tone scale — the basis for our skin-tone model.',
+  },
+  {
+    name: 'Who What Wear',
+    note: 'Leading fashion publication, authoritative on current and enduring colour pairings for women.',
+  },
+  {
+    name: "Gentleman's Gazette / Bond Suits",
+    note: 'Respected classic-menswear authorities — rigorous on colour, shades and combinations.',
+  },
+  {
+    name: 'The Concept Wardrobe',
+    note: 'Trusted, methodical colour-analysis resource grounding which colours flatter which colouring.',
+  },
+];

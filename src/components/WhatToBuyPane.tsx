@@ -2,18 +2,19 @@ import { StyleSheet, Text, View } from 'react-native';
 import { gapSuggestions, skinObj } from '@/engine';
 import { BuyCard } from '@/components/BuyCard';
 import { Icon } from '@/components/Icon';
-import { useStore } from '@/store/useStore';
+import { useActiveWardrobe, useStore } from '@/store/useStore';
 import { fonts } from '@/theme/fonts';
 import { useTheme } from '@/theme/useTheme';
 
 /** "What to buy" gap engine UI — the one or two colours that unlock the most new looks. */
 export function WhatToBuyPane() {
   const t = useTheme();
-  const tops = useStore((s) => s.tops);
-  const bottoms = useStore((s) => s.bottoms);
-  const depth = useStore((s) => s.depth);
+  const w = useActiveWardrobe();
+  const mst = useStore((s) => s.mst);
+  const gender = useStore((s) => s.gender);
+  const mode = useStore((s) => s.mode);
 
-  const { asTops, asBottoms } = gapSuggestions(tops, bottoms, skinObj(depth));
+  const { asTops, asBottoms } = gapSuggestions(w.tops, w.bottoms, skinObj(mst), gender ?? undefined, mode);
   const empty = asTops.length === 0 && asBottoms.length === 0;
 
   return (

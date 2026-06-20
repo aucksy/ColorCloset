@@ -1,9 +1,20 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { LEATHER_HEX, catFor, heritageFor, leatherFor, shadeHex, skinObj, whyFor } from '@/engine';
+import {
+  LEATHER_HEX,
+  catFor,
+  comboWhy,
+  findCurated,
+  leatherFor,
+  shadeHex,
+  shadeHexByName,
+  shadeName,
+  skinObj,
+  tierNote,
+} from '@/engine';
 import { GarmentSilhouette } from '@/components/GarmentSilhouette';
 import { Icon } from '@/components/Icon';
-import { useStore } from '@/store/useStore';
+import { useActiveWardrobe, useStore } from '@/store/useStore';
 import { fonts } from '@/theme/fonts';
 import { useMotion } from '@/theme/useMotion';
 import { useTheme } from '@/theme/useTheme';
@@ -13,45 +24,67 @@ export function OutfitCard() {
   const motion = useMotion();
   const current = useStore((s) => s.current);
   const name = useStore((s) => s.currentName);
-  const style = useStore((s) => s.style);
-  const depth = useStore((s) => s.depth);
-  const shadeTops = useStore((s) => s.shadeTops);
-  const shadeBottoms = useStore((s) => s.shadeBottoms);
-  const worn = useStore((s) => s.worn);
+  const mst = useStore((s) => s.mst);
+  const gender = useStore((s) => s.gender);
+  const mode = useStore((s) => s.mode);
+  const w = useActiveWardrobe();
 
   if (!current) return null;
   const { t: topK, b: botK } = current;
-  const skin = skinObj(depth);
-  const catLabel = style ? style.toUpperCase() : catFor(topK, botK);
-  const topHex = shadeHex(topK, shadeTops[topK]?.[0]);
-  const botHex = shadeHex(botK, shadeBottoms[botK]?.[0]);
-  const why = whyFor(topK, botK, style);
-  const flatterHit = skin.flatter.includes(topK) || skin.flatter.includes(botK);
+
+  const skin = skinObj(mst);
+  // Curated metadata for this gender×mode bucket (null when no profile gender yet).
+  const cur = gender ? findCurated(topK, botK, gender, mode) : null;
+
+  // Owned shade indices for the active bucket (first owned shade per base).
+  const topIdx = w.shadeTops[topK]?.[0];
+  const botIdx = w.shadeBottoms[botK]?.[0];
+
+  // Display names + silhouette colours: curated shade names/hexes when curated,
+  // otherwise the owned (or default) shade for the base.
+  const topName = cur ? cur.topShade : shadeName(topK, topIdx);
+  const botName = cur ? cur.bottomShade : shadeName(botK, botIdx);
+  const topHex = cur ? shadeHexByName(cur.topShade) : shadeHex(topK, topIdx);
+  const botHex = cur ? shadeHexByName(cur.bottomShade) : shadeHex(botK, botIdx);
+
+  // Eyebrow: category label + (specific curated region, e.g. "JAPANESE/TOKYO").
+  const catLabel = catFor(topK, botK, gender ?? undefined, mode);
+  const regionSpecific = cur && !cur.region.startsWith('Universal');
+  const eyebrow = regionSpecific ? `${catLabel} · ${cur!.region.toUpperCase()}` : catLabel;
+
+  // "Why" rationale (named-shade aware, shade names bold).
+  const why = comboWhy({ t: topK, b: botK, curated: cur, topShadeIdx: topIdx, bottomShadeIdx: botIdx });
+  // Tier line — non-null ONLY when a curated combo flatters the user's specific tier.
+  const tier = tierNote(cur, skin);
+
   const id = `${topK}|${botK}`;
-  const wornDate = worn[id];
+  const wornDate = w.worn[id];
   const leather = leatherFor(botK);
   const leatherHex = LEATHER_HEX[leather];
-  const heritage = heritageFor(topK, botK);
 
   return (
     <View style={styles.wrap}>
       <Animated.View key={`hdr-${id}`} entering={FadeInDown.duration(motion.base)} style={styles.center}>
-        <Text style={[styles.cat, { color: t.accent, fontFamily: fonts.mono }]}>
-          {heritage ? `${catLabel} · ${heritage.toUpperCase()}` : catLabel}
-        </Text>
+        <Text style={[styles.cat, { color: t.accent, fontFamily: fonts.mono }]}>{eyebrow}</Text>
         <Text style={[styles.name, { color: t.ink, fontFamily: fonts.display }]}>{name}</Text>
       </Animated.View>
 
       <View style={styles.sils}>
         <View style={styles.sil}>
           <GarmentSilhouette kind="top" color={topHex} duration={motion.slow} />
-          <Text style={[styles.lab, { color: t.ink, fontFamily: fonts.uiBold }]}>{topK}</Text>
+          <Text style={[styles.lab, { color: t.ink, fontFamily: fonts.uiBold }]}>{topName}</Text>
+          {topName !== topK && (
+            <Text style={[styles.base, { color: t.faint, fontFamily: fonts.uiRegular }]}>{topK}</Text>
+          )}
           <Text style={[styles.sub, { color: t.muted, fontFamily: fonts.mono }]}>SHIRT</Text>
         </View>
         <Text style={[styles.plus, { color: t.faint, fontFamily: fonts.display }]}>+</Text>
         <View style={styles.sil}>
           <GarmentSilhouette kind="bottom" color={botHex} duration={motion.slow} />
-          <Text style={[styles.lab, { color: t.ink, fontFamily: fonts.uiBold }]}>{botK}</Text>
+          <Text style={[styles.lab, { color: t.ink, fontFamily: fonts.uiBold }]}>{botName}</Text>
+          {botName !== botK && (
+            <Text style={[styles.base, { color: t.faint, fontFamily: fonts.uiRegular }]}>{botK}</Text>
+          )}
           <Text style={[styles.sub, { color: t.muted, fontFamily: fonts.mono }]}>TROUSERS</Text>
         </View>
       </View>
@@ -66,23 +99,20 @@ export function OutfitCard() {
           </View>
         </View>
 
+        {(tier || wornDate) && (
+          <View style={styles.pills}>
+            {wornDate && (
+              <View style={[styles.pill, { backgroundColor: t.glass, borderColor: t.line }]}>
+                <Icon name="clock" size={13} color={t.muted} />
+                <Text style={[styles.pillTxt, { color: t.muted, fontFamily: fonts.uiSemi }]}>Worn {wornDate}</Text>
+              </View>
+            )}
+          </View>
+        )}
 
-        <View style={styles.pills}>
-          {flatterHit && (
-            <View style={[styles.pill, { backgroundColor: 'rgba(201,168,106,0.10)', borderColor: 'rgba(201,168,106,0.22)' }]}>
-              <Icon name="star" size={13} color={t.accent} />
-              <Text style={[styles.pillTxt, { color: t.accent, fontFamily: fonts.uiSemi }]}>
-                Flatters your {skin.short.toLowerCase()} skin
-              </Text>
-            </View>
-          )}
-          {wornDate && (
-            <View style={[styles.pill, { backgroundColor: t.glass, borderColor: t.line }]}>
-              <Icon name="clock" size={13} color={t.muted} />
-              <Text style={[styles.pillTxt, { color: t.muted, fontFamily: fonts.uiSemi }]}>Worn {wornDate}</Text>
-            </View>
-          )}
-        </View>
+        {tier && (
+          <Text style={[styles.tier, { color: t.accent, fontFamily: fonts.uiSemi }]}>{tier}</Text>
+        )}
 
         <View style={[styles.why, { backgroundColor: t.glass, borderColor: t.line }]}>
           <Text style={[styles.whyTxt, { color: t.ink, fontFamily: fonts.uiRegular }]}>
@@ -116,8 +146,9 @@ const styles = StyleSheet.create({
   name: { fontSize: 30, marginTop: 7, marginBottom: 14, textAlign: 'center', letterSpacing: -0.3 },
   sils: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 16, minHeight: 210, width: '100%' },
   sil: { width: 130, alignItems: 'center' },
-  lab: { marginTop: 11, fontSize: 12.5 },
-  sub: { fontSize: 9, letterSpacing: 0.8 },
+  lab: { marginTop: 11, fontSize: 12.5, textAlign: 'center' },
+  base: { fontSize: 10, marginTop: 2, textAlign: 'center' },
+  sub: { fontSize: 9, letterSpacing: 0.8, marginTop: 3 },
   plus: { fontSize: 22, alignSelf: 'center', marginBottom: 36 },
   leather: { borderWidth: 1, borderRadius: 14, paddingVertical: 11, paddingHorizontal: 14, marginTop: 14, alignSelf: 'stretch', gap: 9 },
   leatherLab: { fontSize: 9, letterSpacing: 1.4 },
@@ -128,6 +159,7 @@ const styles = StyleSheet.create({
   pills: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 12 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 99, borderWidth: 1 },
   pillTxt: { fontSize: 11.5 },
+  tier: { fontSize: 12, marginTop: 12, textAlign: 'center' },
   why: { borderWidth: 1, borderRadius: 16, padding: 15, marginTop: 16, width: '100%' },
   whyTxt: { fontSize: 13.5, lineHeight: 21 },
 });

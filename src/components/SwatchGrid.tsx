@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { COLORS, KEYS, type ColorKey, type ShadeIndex } from '@/engine';
+import { COLORS, KEYS, shadeName, type ColorKey, type ShadeIndex } from '@/engine';
 import { Icon } from '@/components/Icon';
-import { useStore } from '@/store/useStore';
+import { useStore, useActiveWardrobe } from '@/store/useStore';
 import { fonts } from '@/theme/fonts';
 import { useTheme } from '@/theme/useTheme';
 
@@ -10,15 +10,16 @@ interface Props {
 }
 
 /**
- * The manual colour palette. Two columns so each colour patch — and the 5 shade
- * chips beneath it — are large enough to tap comfortably. Tap the patch to select
- * the colour; tap the shade chips (more than one allowed) to record which shades
- * you actually own.
+ * The manual colour palette. Two columns so each colour patch — and the named
+ * shade chips beneath it — are large enough to tap comfortably. Tap the patch to
+ * select the colour; tap the shade chips (more than one allowed) to record which
+ * shades you actually own. Reads the active gender×mode wardrobe bucket.
  */
 export function SwatchGrid({ slot }: Props) {
   const t = useTheme();
-  const selected = useStore((s) => (slot === 'tops' ? s.tops : s.bottoms));
-  const shades = useStore((s) => (slot === 'tops' ? s.shadeTops : s.shadeBottoms));
+  const w = useActiveWardrobe();
+  const selected = slot === 'tops' ? w.tops : w.bottoms;
+  const shades = slot === 'tops' ? w.shadeTops : w.shadeBottoms;
   const toggleColor = useStore((s) => s.toggleColor);
   const toggleShade = useStore((s) => s.toggleShade);
 
@@ -26,8 +27,10 @@ export function SwatchGrid({ slot }: Props) {
     <View style={styles.grid}>
       {KEYS.map((k: ColorKey) => {
         const on = selected.includes(k);
-        const picked = shades[k] ?? [2];
-        const fill = COLORS[k].shades[picked[0] ?? 2];
+        const def = COLORS[k].baseIdx;
+        const picked = shades[k] ?? [def];
+        const fill = COLORS[k].shades[picked[0] ?? def];
+        const count = COLORS[k].shades.length;
         return (
           <View key={k} style={styles.cellWrap}>
             <View style={[styles.swatch, { borderColor: on ? t.accent : 'transparent' }]}>
@@ -53,7 +56,7 @@ export function SwatchGrid({ slot }: Props) {
                       <Pressable
                         key={i}
                         accessibilityRole="button"
-                        accessibilityLabel={`${k} shade ${i + 1} of 5`}
+                        accessibilityLabel={`${shadeName(k, i)} (shade ${i + 1} of ${count})`}
                         accessibilityState={{ selected: active }}
                         onPress={() => toggleShade(slot, k, i as ShadeIndex)}
                         style={({ pressed }) => [styles.chipHit, { transform: [{ scale: pressed ? 0.9 : 1 }] }]}
@@ -70,6 +73,17 @@ export function SwatchGrid({ slot }: Props) {
                     );
                   })}
                 </View>
+              )}
+
+              {on && picked.length > 0 && (
+                <Text
+                  numberOfLines={1}
+                  style={[styles.shadeCaption, { color: t.muted, fontFamily: fonts.ui, backgroundColor: t.bg }]}
+                >
+                  {picked.length === 1
+                    ? shadeName(k, picked[0])
+                    : `${picked.length} shades`}
+                </Text>
               )}
             </View>
             <Text style={[styles.name, { color: on ? t.ink : t.muted, fontFamily: fonts.uiSemi }]}>{k}</Text>
@@ -95,8 +109,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  strip: { flexDirection: 'row', gap: 4, padding: 6 },
+  strip: { flexDirection: 'row', gap: 4, paddingHorizontal: 6, paddingTop: 6 },
   chipHit: { flex: 1, alignItems: 'stretch' },
   chip: { height: 38, borderRadius: 7, borderWidth: 1 },
+  shadeCaption: { fontSize: 10.5, textAlign: 'center', paddingBottom: 6, paddingTop: 3, paddingHorizontal: 6 },
   name: { fontSize: 12, textAlign: 'center', paddingVertical: 9, paddingHorizontal: 4 },
 });

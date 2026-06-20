@@ -1,40 +1,81 @@
 /**
- * Combination universe, stats, and the ordered "Another" deck walk.
- * Pure ports of the prototype (lines ~919-956). The engine builds and walks the
- * deck deterministically; the store/hook owns memo-caching and the walk position.
+ * Combination universe, stats, and the ordered "Another" deck walk — the layer that
+ * turns the owned wardrobe into a ranked deck of looks (ENGINE_REBUILD_SPEC §8).
+ *
+ * The curated dataset is the high-confidence spine: when the gender×mode bucket is
+ * known, every curated, ownable pairing is force-included and carries its named-shade
+ * `meta`; generative pairings join only if they clear `UNIVERSE_THRESHOLD`. Avoided
+ * base pairs are EXCLUDED structurally (never scored), with a single-best fallback so
+ * the user is never left with an empty deck.
+ *
+ * Pure & dependency-free (no React-Native / Expo / store imports). The store/hook owns
+ * memo-caching (via `deckKey`) and the walk position; this module is deterministic.
+ *
+ * Data/shape contract: ENGINE_REBUILD_SPEC §8. Scoring lives in `./scoring`, curated
+ * lookup in `./combos`.
  */
-import { score } from './scoring';
+import { score, isAvoided } from './scoring';
+import { findCurated } from './combos';
 import { UNIVERSE_THRESHOLD } from './constants';
-import type { ColorKey, Combo, RankedCombo, SkinObj, StyleName } from './types';
+import type { ColorKey, Combo, Gender, Mode, RankedCombo, SkinObj, StyleName } from './types';
 
 /**
- * Every (top × bottom) whose base score (no style) meets the universe threshold
- * (0.55), best-first. Stable across style. If nothing clears the threshold, returns
- * the single best pairing so the user is never stuck.
+ * Every viable (top × bottom) pairing for the owned wardrobe, best-first.
+ *
+ * For each `t∈tops, b∈bottoms`:
+ *  - skip if `isAvoided(t,b)` (the four suppressed base pairs are never scored);
+ *  - score with no style but with the gender×mode `ctx` so the curated spine bonus applies;
+ *  - attach `curated` via `findCurated` when both `gender` and `mode` are known;
+ *  - include the pairing iff it is curated OR `sc >= UNIVERSE_THRESHOLD` (0.55).
+ *
+ * If nothing clears the bar, fall back to the single best NON-avoided pairing so the
+ * deck is never empty; only if literally every pairing is avoided do we surface the
+ * best avoided one (so the user isn't stuck). Results are sorted by `sc` desc (stable)
+ * and de-duplicated by `id` (`${t}|${b}`).
  */
 export function comboUniverse(
   tops: ColorKey[],
   bottoms: ColorKey[],
-  skin: SkinObj | null
+  skin: SkinObj | null,
+  gender?: Gender | null,
+  mode?: Mode | null
 ): Combo[] {
+  const ctx = { gender: gender ?? undefined, mode: mode ?? undefined };
   const out: Combo[] = [];
+  // Track the best non-avoided and best overall (incl. avoided) for the fallback path.
+  let bestOpen: Combo | null = null;
+  let bestAny: Combo | null = null;
+
   tops.forEach((t) =>
     bottoms.forEach((b) => {
-      const sc = score(t, b, skin);
-      if (sc >= UNIVERSE_THRESHOLD) out.push({ id: t + '|' + b, t, b, sc });
+      const avoided = isAvoided(t, b);
+      const sc = score(t, b, skin, undefined, ctx);
+      const cand: Combo = { id: t + '|' + b, t, b, sc };
+      if (!bestAny || sc > bestAny.sc) bestAny = cand;
+      if (avoided) return; // suppressed base pair — never in the universe (except fallback)
+      if (!bestOpen || sc > bestOpen.sc) bestOpen = cand;
+
+      const curated = gender && mode ? findCurated(t, b, gender, mode) : undefined;
+      if (curated) {
+        out.push({ ...cand, curated });
+      } else if (sc >= UNIVERSE_THRESHOLD) {
+        out.push(cand);
+      }
     })
   );
+
+  // Never leave the user with an empty deck: prefer the best non-avoided pairing; only
+  // if every single pairing is avoided do we surface the best avoided one.
   if (!out.length) {
-    let best: Combo | null = null;
-    tops.forEach((t) =>
-      bottoms.forEach((b) => {
-        const sc = score(t, b, skin);
-        if (!best || sc > best.sc) best = { id: t + '|' + b, t, b, sc };
-      })
-    );
-    if (best) out.push(best);
+    const fb: Combo | null = bestOpen ?? bestAny;
+    if (fb) out.push(fb);
   }
-  return out.sort((a, b) => b.sc - a.sc);
+
+  // De-dup by id (curated + threshold paths can never both push the same pair, but the
+  // fallback could echo one already present), then sort best-first (stable).
+  const seen = new Set<string>();
+  const uniq = out.filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)));
+  return uniq.sort((a, b) => b.sc - a.sc);
 }
 
 export interface UniStats {
@@ -48,29 +89,58 @@ export function uniStats(
   tops: ColorKey[],
   bottoms: ColorKey[],
   skin: SkinObj | null,
-  worn: Record<string, string>
+  worn: Record<string, string>,
+  gender?: Gender | null,
+  mode?: Mode | null
 ): UniStats {
-  const uni = comboUniverse(tops, bottoms, skin);
+  const uni = comboUniverse(tops, bottoms, skin, gender, mode);
   const w = Object.keys(worn).filter((id) => uni.some((c) => c.id === id)).length;
   return { uni, total: uni.length, worn: w };
 }
 
+/**
+ * Deck-build context — the active wardrobe bucket plus its style/skin. `gender` may be
+ * null before onboarding picks one; `mode` always has a value (defaults to 'formal').
+ */
 export interface DeckContext {
   tops: ColorKey[];
   bottoms: ColorKey[];
   skin: SkinObj | null;
   style: StyleName;
+  gender: Gender | null;
+  mode: Mode;
 }
 
-/** Memo key — when this string is unchanged, the deck need not be rebuilt. */
+/**
+ * Memo key — when this string is unchanged, the deck need not be rebuilt. Includes
+ * everything that changes the deck: gender, mode, style, skin (mst), and the owned
+ * tops/bottoms.
+ */
 export function deckKey(ctx: DeckContext): string {
-  return [ctx.style, ctx.skin?.depth ?? '', ctx.tops.join(','), ctx.bottoms.join(',')].join('|');
+  return [
+    ctx.gender ?? '',
+    ctx.mode,
+    ctx.style,
+    ctx.skin?.mst ?? '',
+    ctx.tops.join(','),
+    ctx.bottoms.join(','),
+  ].join('|');
 }
 
-/** The universe re-scored for the current style and sorted best-first. */
+/**
+ * The universe re-scored for the current style (and gender×mode curated bonus), sorted
+ * best-first by the occasion/style score `osc`. The curated `meta` carried by the
+ * universe is preserved so cards keep their named-shade copy.
+ */
 export function buildDeck(ctx: DeckContext): RankedCombo[] {
-  return comboUniverse(ctx.tops, ctx.bottoms, ctx.skin)
-    .map((c) => ({ ...c, osc: score(c.t, c.b, ctx.skin, ctx.style) }))
+  return comboUniverse(ctx.tops, ctx.bottoms, ctx.skin, ctx.gender, ctx.mode)
+    .map((c) => ({
+      ...c,
+      osc: score(c.t, c.b, ctx.skin, ctx.style, {
+        gender: ctx.gender ?? undefined,
+        mode: ctx.mode,
+      }),
+    }))
     .sort((a, b) => b.osc - a.osc);
 }
 

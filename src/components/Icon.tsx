@@ -26,7 +26,9 @@ export type IconName =
   | 'setup'
   | 'reset'
   | 'list'
-  | 'trash';
+  | 'trash'
+  | 'cloud'
+  | 'logout';
 
 function paths(name: IconName, c: string, sw: number): ReactNode {
   const p = (d: string, fill = 'none') => (
@@ -90,6 +92,10 @@ function paths(name: IconName, c: string, sw: number): ReactNode {
       return p('M4 7h16M4 12h16M4 17h10');
     case 'trash':
       return p('M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13');
+    case 'cloud':
+      return p('M7 18a4 4 0 0 1-.4-7.98A6 6 0 0 1 18 9a4 4 0 0 1 0 9z');
+    case 'logout':
+      return p('M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3');
   }
 }
 

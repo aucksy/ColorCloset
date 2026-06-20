@@ -7,11 +7,14 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useHydrated } from '@/store/useStore';
 import { configureNotifications } from '@/lib/notify';
+import { configureDrive } from '@/lib/drive';
+import { DriveAutoBackup } from '@/components/DriveAutoBackup';
 import { fontMap } from '@/theme/fonts';
 import { useTheme } from '@/theme/useTheme';
 
 SplashScreen.preventAutoHideAsync();
 configureNotifications();
+configureDrive();
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts(fontMap);
@@ -40,6 +43,7 @@ export default function RootLayout() {
           <Stack.Screen name="onboarding" />
           <Stack.Screen name="main" />
         </Stack>
+        <DriveAutoBackup />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

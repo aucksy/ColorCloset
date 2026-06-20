@@ -1,27 +1,23 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { comboUniverse, hx, nameFor, shadeHex, skinObj, type Combo } from '@/engine';
+import { comboName, comboUniverse, hx, shadeHex, skinObj, type Combo } from '@/engine';
 import { Icon } from '@/components/Icon';
 import { PanelShell } from '@/components/PanelShell';
 import { ProgressBar } from '@/components/ProgressBar';
-import { useStore } from '@/store/useStore';
+import { useActiveWardrobe, useStore } from '@/store/useStore';
 import { useUiStore } from '@/store/uiStore';
 import { fonts } from '@/theme/fonts';
 import { useTheme } from '@/theme/useTheme';
 
-const fixedName = (t: string, b: string) => nameFor(t, b, undefined, () => 0);
-
 export function CombinationsPanel() {
   const t = useTheme();
   const closePanel = useUiStore((s) => s.closePanel);
-  const tops = useStore((s) => s.tops);
-  const bottoms = useStore((s) => s.bottoms);
-  const depth = useStore((s) => s.depth);
-  const worn = useStore((s) => s.worn);
-  const dismissed = useStore((s) => s.dismissed);
-  const shadeTops = useStore((s) => s.shadeTops);
-  const shadeBottoms = useStore((s) => s.shadeBottoms);
+  const setPane = useUiStore((s) => s.setPane);
+  const w = useActiveWardrobe();
+  const mst = useStore((s) => s.mst);
+  const gender = useStore((s) => s.gender);
+  const mode = useStore((s) => s.mode);
   const loadCombo = useStore((s) => s.loadCombo);
   const restoreDismissed = useStore((s) => s.restoreDismissed);
   const clearWorn = useStore((s) => s.clearWorn);
@@ -30,16 +26,17 @@ export function CombinationsPanel() {
   const [wornOpen, setWornOpen] = useState(true);
   const [dismissedOpen, setDismissedOpen] = useState(false);
 
-  const uni = comboUniverse(tops, bottoms, skinObj(depth));
-  const active = uni.filter((c) => !dismissed[c.id]);
-  const notWorn = active.filter((c) => !worn[c.id]);
-  const did = active.filter((c) => worn[c.id]);
-  const dismissedCombos = uni.filter((c) => dismissed[c.id]);
+  const uni = comboUniverse(w.tops, w.bottoms, skinObj(mst), gender, mode);
+  const active = uni.filter((c) => !w.dismissed[c.id]);
+  const notWorn = active.filter((c) => !w.worn[c.id]);
+  const did = active.filter((c) => w.worn[c.id]);
+  const dismissedCombos = uni.filter((c) => w.dismissed[c.id]);
   const total = active.length;
   const wornCount = did.length;
 
   const open = (c: Combo) => {
     loadCombo(c.t, c.b);
+    setPane('rec'); // switch to "Style me" so the loaded combo is visible
     closePanel();
   };
 
@@ -47,16 +44,16 @@ export function CombinationsPanel() {
     <Animated.View entering={FadeInDown.duration(340).delay(Math.min(i, 9) * 34)}>
       <Pressable onPress={() => open(c)} style={({ pressed }) => [styles.row, { backgroundColor: t.glass, borderColor: t.line, opacity: pressed ? 0.7 : isWorn ? 0.62 : 1 }]}>
         <View style={[styles.pair, { borderColor: t.line2 }]}>
-          <View style={{ flex: 1, backgroundColor: shadeHex(c.t, shadeTops[c.t]?.[0]) }} />
-          <View style={{ flex: 1, backgroundColor: shadeHex(c.b, shadeBottoms[c.b]?.[0]) }} />
+          <View style={{ flex: 1, backgroundColor: shadeHex(c.t, w.shadeTops[c.t]?.[0]) }} />
+          <View style={{ flex: 1, backgroundColor: shadeHex(c.b, w.shadeBottoms[c.b]?.[0]) }} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.cn, { color: t.ink, fontFamily: fonts.uiSemi }]}>{c.t} + {c.b}</Text>
-          <Text style={[styles.cs, { color: t.muted, fontFamily: fonts.uiRegular }]}>{fixedName(c.t, c.b)}</Text>
+          <Text style={[styles.cs, { color: t.muted, fontFamily: fonts.uiRegular }]}>{comboName(c.t, c.b, c.curated)}</Text>
         </View>
         <View style={[styles.badge, isWorn ? { backgroundColor: t.glass2, borderColor: t.line, borderWidth: 1 } : { backgroundColor: t.gold }]}>
           <Text style={[styles.badgeTxt, { color: isWorn ? t.muted : t.onGold, fontFamily: fonts.monoBold }]}>
-            {isWorn ? `WORN · ${worn[c.id]}` : 'NOT WORN'}
+            {isWorn ? `WORN · ${w.worn[c.id]}` : 'NOT WORN'}
           </Text>
         </View>
       </Pressable>
@@ -110,8 +107,8 @@ export function CombinationsPanel() {
             dismissedCombos.map((c) => (
               <View key={c.id} style={[styles.row, { backgroundColor: t.glass, borderColor: t.line, opacity: 0.7 }]}>
                 <View style={[styles.pair, { borderColor: t.line2 }]}>
-                  <View style={{ flex: 1, backgroundColor: shadeHex(c.t, shadeTops[c.t]?.[0]) || hx(c.t) }} />
-                  <View style={{ flex: 1, backgroundColor: shadeHex(c.b, shadeBottoms[c.b]?.[0]) || hx(c.b) }} />
+                  <View style={{ flex: 1, backgroundColor: shadeHex(c.t, w.shadeTops[c.t]?.[0]) || hx(c.t) }} />
+                  <View style={{ flex: 1, backgroundColor: shadeHex(c.b, w.shadeBottoms[c.b]?.[0]) || hx(c.b) }} />
                 </View>
                 <Text style={[styles.cn, { flex: 1, color: t.muted, fontFamily: fonts.uiSemi }]}>{c.t} + {c.b}</Text>
                 <Pressable onPress={() => restoreDismissed(c.id)} style={[styles.restore, { borderColor: t.line2 }]}>

@@ -1,15 +1,14 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { STYLES, buildDeck, skinObj, type StyleName } from '@/engine';
 import { Button } from '@/components/Button';
 import { ChipRow } from '@/components/ChipRow';
 import { Icon } from '@/components/Icon';
 import { Logo } from '@/components/Logo';
-import { ProgressBar } from '@/components/ProgressBar';
-import { Segmented, type Pane } from '@/components/Segmented';
+import { Segmented } from '@/components/Segmented';
 import { SideMenu } from '@/components/SideMenu';
 import { SwipeDeck } from '@/components/SwipeDeck';
 import { Toast } from '@/components/Toast';
@@ -20,8 +19,9 @@ import { CombinationsPanel } from '@/components/panels/CombinationsPanel';
 import { ReminderPanel } from '@/components/panels/ReminderPanel';
 import { SavedPanel } from '@/components/panels/SavedPanel';
 import { SkinPanel } from '@/components/panels/SkinPanel';
+import { SourcesPanel } from '@/components/panels/SourcesPanel';
 import { useMotion } from '@/theme/useMotion';
-import { useStore } from '@/store/useStore';
+import { useActiveWardrobe, useStore } from '@/store/useStore';
 import { useUiStore } from '@/store/uiStore';
 import { fonts } from '@/theme/fonts';
 import { useTheme } from '@/theme/useTheme';
@@ -37,18 +37,15 @@ export default function Main() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const motion = useMotion();
-  const [pane, setPane] = useState<Pane>('rec');
   const [onToday, setOnToday] = useState(false);
 
   const current = useStore((s) => s.current);
   const deckPos = useStore((s) => s.deckPos);
   const style = useStore((s) => s.style);
   const setStyle = useStore((s) => s.setStyle);
-  const tops = useStore((s) => s.tops);
-  const bottoms = useStore((s) => s.bottoms);
-  const depth = useStore((s) => s.depth);
-  const worn = useStore((s) => s.worn);
-  const dismissed = useStore((s) => s.dismissed);
+  const mst = useStore((s) => s.mst);
+  const gender = useStore((s) => s.gender);
+  const mode = useStore((s) => s.mode);
   const regenerate = useStore((s) => s.regenerate);
   const next = useStore((s) => s.next);
   const prev = useStore((s) => s.prev);
@@ -57,12 +54,17 @@ export default function Main() {
   const dismiss = useStore((s) => s.dismiss);
   const saveCurrent = useStore((s) => s.saveCurrent);
   const clearWorn = useStore((s) => s.clearWorn);
-  const saved = useStore((s) => s.saved);
-  const lastPickDay = useStore((s) => s.lastPickDay);
   const setLastPickDay = useStore((s) => s.setLastPickDay);
+  const coachSeen = useStore((s) => s.coachSeen);
+  const markCoachSeen = useStore((s) => s.markCoachSeen);
 
+  // All wardrobe data + history reads the ACTIVE gender×mode bucket.
+  const w = useActiveWardrobe();
+
+  // Pane lives in uiStore so the rotation/saved panels can switch back to "Style me".
+  const pane = useUiStore((s) => s.pane);
+  const setPane = useUiStore((s) => s.setPane);
   const openDrawer = useUiStore((s) => s.openDrawer);
-  const openPanel = useUiStore((s) => s.openPanel);
   const closePanel = useUiStore((s) => s.closePanel);
   const drawerOpen = useUiStore((s) => s.drawerOpen);
   const closeDrawer = useUiStore((s) => s.closeDrawer);
@@ -71,16 +73,19 @@ export default function Main() {
 
   // The browsable deck (excludes "not for me") — drives the counter + worn progress.
   const deck = useMemo(
-    () => buildDeck({ tops, bottoms, skin: skinObj(depth), style }).filter((c) => !dismissed[c.id]),
-    [tops, bottoms, depth, style, dismissed]
+    () =>
+      buildDeck({ tops: w.tops, bottoms: w.bottoms, skin: skinObj(mst), style, gender, mode }).filter(
+        (c) => !w.dismissed[c.id]
+      ),
+    [w.tops, w.bottoms, w.dismissed, mst, style, gender, mode]
   );
   const total = deck.length;
-  const wornCount = useMemo(() => deck.filter((c) => worn[c.id]).length, [deck, worn]);
+  const wornCount = useMemo(() => deck.filter((c) => w.worn[c.id]).length, [deck, w.worn]);
 
   // First entry: seed a decisive "Today's pick" once a day (a strong, day-stable look).
   useLayoutEffect(() => {
     const day = new Date().toISOString().slice(0, 10);
-    if (deck.length && lastPickDay !== day) {
+    if (deck.length && w.lastPickDay !== day) {
       const span = Math.max(1, Math.ceil(deck.length * 0.3));
       goToIndex(hashDay(day) % span);
       setLastPickDay(day);
@@ -108,9 +113,41 @@ export default function Main() {
       return false;
     });
     return () => sub.remove();
-  }, [panel, drawerOpen, closePanel, closeDrawer, pane]);
+  }, [panel, drawerOpen, closePanel, closeDrawer, pane, setPane]);
 
-  const isSaved = !!current && saved.some((x) => x.t === current.t && x.b === current.b);
+  const isSaved = !!current && w.saved.some((x) => x.t === current.t && x.b === current.b);
+
+  // Dismissible "double-tap to save" coachmark — shows once, after the first card
+  // entrance settles, only while browsing recs and never if already acknowledged.
+  const [coachVisible, setCoachVisible] = useState(false);
+  const coachShown = useRef(false);
+  useEffect(() => {
+    if (coachSeen || coachShown.current) return;
+    if (pane !== 'rec' || !current) return;
+    // Latch the one-shot guard only when it ACTUALLY shows — not when scheduled — so a
+    // swipe / style-change within the delay (which churns `current` and re-runs this
+    // effect) reschedules the timer instead of permanently suppressing the coachmark.
+    const showId = setTimeout(() => {
+      coachShown.current = true;
+      setCoachVisible(true);
+    }, motion.base + 700);
+    return () => clearTimeout(showId);
+  }, [coachSeen, pane, current, motion.base]);
+
+  // Auto-dismiss the coachmark after a few seconds once it's on screen.
+  useEffect(() => {
+    if (!coachVisible) return;
+    const id = setTimeout(() => {
+      setCoachVisible(false);
+      markCoachSeen();
+    }, 4000);
+    return () => clearTimeout(id);
+  }, [coachVisible, markCoachSeen]);
+
+  const dismissCoach = () => {
+    setCoachVisible(false);
+    markCoachSeen();
+  };
 
   // Offer to reset worn history once everything's been worn.
   const prompted = useRef(false);
@@ -140,6 +177,9 @@ export default function Main() {
     showToast('Saved to your looks');
     return true;
   };
+
+  // Casual lazy onboarding: an empty casual bucket gets mode-aware copy/CTA.
+  const isEmptyCasual = mode === 'casual' && w.tops.length === 0 && w.bottoms.length === 0;
 
   return (
     <View style={[styles.root, { backgroundColor: t.bg, paddingTop: insets.top }]}>
@@ -172,7 +212,7 @@ export default function Main() {
               <Text style={[styles.todayTxt, { color: t.accent, fontFamily: fonts.uiBold }]}>TODAY’S PICK</Text>
             </View>
           ) : (
-            <Text style={[styles.hint, { color: t.faint, fontFamily: fonts.uiRegular }]}>Swipe · double-tap to save</Text>
+            <Text style={[styles.hint, { color: t.faint, fontFamily: fonts.uiRegular }]}>Swipe to browse</Text>
           )}
         </View>
       )}
@@ -189,6 +229,19 @@ export default function Main() {
             <View style={{ marginTop: 12 }}>
               {current ? (
                 <SwipeDeck pos={deckPos} total={total} onNext={onNext} onPrev={onPrev} onSave={onSave} />
+              ) : isEmptyCasual ? (
+                <View style={styles.emptyRec}>
+                  <View style={[styles.emptyIc, { backgroundColor: t.glass, borderColor: t.line }]}>
+                    <Icon name="grid" size={24} color={t.accent} />
+                  </View>
+                  <Text style={[styles.emptyH, { color: t.ink, fontFamily: fonts.display }]}>No casual looks yet</Text>
+                  <Text style={[styles.emptyP, { color: t.muted, fontFamily: fonts.uiRegular }]}>
+                    Add the colours you wear casually.
+                  </Text>
+                  <View style={styles.emptyBtn}>
+                    <Button title="Add casual colours" variant="goldline" onPress={() => router.push({ pathname: '/onboarding', params: { mode: 'add' } })} />
+                  </View>
+                </View>
               ) : (
                 <View style={styles.emptyRec}>
                   <View style={[styles.emptyIc, { backgroundColor: t.glass, borderColor: t.line }]}>
@@ -211,6 +264,24 @@ export default function Main() {
           </Animated.View>
         )}
       </ScrollView>
+
+      {/* dismissible coachmark — appears once after the first card settles */}
+      {pane === 'rec' && current && coachVisible && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Got it"
+          onPress={dismissCoach}
+          style={[styles.coachWrap, { bottom: insets.bottom + 96 }]}
+        >
+          <Animated.View
+            entering={FadeInDown.duration(motion.base)}
+            style={[styles.coach, { backgroundColor: t.surface, borderColor: t.accent }]}
+          >
+            <Icon name="heart" size={15} color={t.accent} />
+            <Text style={[styles.coachTxt, { color: t.ink, fontFamily: fonts.uiSemi }]}>Double-tap to save a look</Text>
+          </Animated.View>
+        </Pressable>
+      )}
 
       {/* always-visible action bar: not-for-me · save · mark worn */}
       {pane === 'rec' && current && (
@@ -237,6 +308,7 @@ export default function Main() {
       {panel === 'saved' && <SavedPanel />}
       {panel === 'reminder' && <ReminderPanel />}
       {panel === 'backup' && <BackupPanel />}
+      {panel === 'sources' && <SourcesPanel />}
       <SideMenu />
       <Toast />
     </View>
@@ -255,6 +327,9 @@ const styles = StyleSheet.create({
   todayPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 99, paddingVertical: 4, paddingHorizontal: 10 },
   todayTxt: { fontSize: 10, letterSpacing: 0.8 },
   chLabel: { fontSize: 10, letterSpacing: 1.6, marginTop: 8, marginBottom: 7 },
+  coachWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 40 },
+  coach: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 99, paddingVertical: 9, paddingHorizontal: 15 },
+  coachTxt: { fontSize: 12.5 },
   bar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 10, alignItems: 'stretch', paddingHorizontal: 18, paddingTop: 10, borderTopWidth: 1 },
   iconAct: { width: 56, borderWidth: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center', paddingVertical: 14 },
   emptyRec: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 20 },

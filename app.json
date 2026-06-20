@@ -51,7 +51,8 @@
         {
           "color": "#C9A86A"
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -59,6 +60,7 @@
     },
     "extra": {
       "router": {},
+      "googleWebClientId": "240978491498-ddd3k6hv2bgqv6ovkl662mguv5tt8nr2.apps.googleusercontent.com",
       "eas": {
         "projectId": "8d670d23-9f4d-4a54-adf3-99c5b801d063"
       }

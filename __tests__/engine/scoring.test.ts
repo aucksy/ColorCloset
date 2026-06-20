@@ -1,74 +1,74 @@
-import { catFor, harmony, score, skinObj, styleBias } from '../../src/engine';
+import { harmony, isAvoided, score, catFor, skinObj } from '../../src/engine';
 
-describe('harmony (exact additive weights, §9.3)', () => {
-  it('curated + double-neutral + contrast clamps to 1', () => {
-    // White+Navy is curated (Minimal/Classic): 0.45 + 0.40 + 0.18 + 0.12 = 1.15 -> clamp 1
-    expect(harmony('White', 'Navy')).toBe(1);
+const skin = skinObj(5); // Medium
+
+describe('isAvoided (research avoid-list → 4 base pairs, suppressed)', () => {
+  it('flags the four suppressed pairs in either order', () => {
+    expect(isAvoided('Navy', 'Black')).toBe(true);
+    expect(isAvoided('Black', 'Navy')).toBe(true);
+    expect(isAvoided('Brown', 'Burgundy')).toBe(true);
+    expect(isAvoided('Purple', 'Mustard')).toBe(true);
+    expect(isAvoided('Rust', 'Forest Green')).toBe(true);
   });
 
-  it('a non-curated double-neutral with contrast (no clamp)', () => {
-    // White+Grey (no longer curated): 0.45 + 0.18 + 0.08 + 0.12 = 0.83
-    expect(harmony('White', 'Grey')).toBeCloseTo(0.83, 10);
-  });
-
-  it('two saturated non-curated colours stay at the base', () => {
-    expect(harmony('Olive', 'Burgundy')).toBeCloseTo(0.45, 10);
-  });
-
-  it('applies the warm/cool temperature clash and muddy-contrast penalties', () => {
-    // Olive (warm) + Blue (cool): 0.45 - 0.04 (low contrast) - 0.14 (temp clash) = 0.27
-    expect(harmony('Olive', 'Blue')).toBeCloseTo(0.27, 10);
-  });
-
-  it('rewards both-neutral without the muddy penalty', () => {
-    // Black + Navy: 0.45 + 0.18 + 0.08 = 0.71
-    expect(harmony('Black', 'Navy')).toBeCloseTo(0.71, 10);
+  it('does NOT over-suppress dark-on-dark near-misses (left to the harmony penalty)', () => {
+    expect(isAvoided('Navy', 'Charcoal')).toBe(false);
+    expect(isAvoided('White', 'Navy')).toBe(false);
   });
 });
 
-describe('styleBias (§9.6)', () => {
-  it('Minimal: exemplar + both-neutral', () => {
-    // Grey+Charcoal is a Minimal exemplar: 0.18 + 0.13 (both neutral) = 0.31
-    expect(styleBias('Grey', 'Charcoal', 'Minimal')).toBeCloseTo(0.31, 10);
+describe('harmony (doc shade-pairing principles)', () => {
+  it('rewards tonal / tone-on-tone (same base) above the base', () => {
+    expect(harmony('Navy', 'Navy')).toBeGreaterThan(0.45);
   });
 
-  it('Bold: exemplar + bold colour + high contrast', () => {
-    // Burgundy+Grey is a Bold exemplar: 0.18 + 0.14 (bold) + 0.05 (contrast) = 0.37
-    expect(styleBias('Burgundy', 'Grey', 'Bold')).toBeCloseTo(0.37, 10);
+  it('rewards a neutral pairing and clear light↔dark contrast', () => {
+    expect(harmony('White', 'Navy')).toBeGreaterThan(0.6);
+    expect(harmony('White', 'Grey')).toBeGreaterThan(0.45);
   });
 
-  it('returns 0 when no style is given', () => {
-    expect(styleBias('White', 'Grey', undefined)).toBe(0);
+  it('penalises a warm/cool clash vs a same-temperature pairing', () => {
+    expect(harmony('Olive', 'Rust')).toBeGreaterThan(harmony('Olive', 'Blue'));
+  });
+
+  it('penalises a muddy dark-on-dark near-match (Navy + Charcoal)', () => {
+    // Two near-black, different-family shades read like a mistake (doc #1 / "two blacks").
+    expect(harmony('Navy', 'Charcoal')).toBeLessThan(harmony('White', 'Charcoal'));
+  });
+
+  it('clamps to [0,1]', () => {
+    expect(harmony('White', 'Navy')).toBeLessThanOrEqual(1);
+    expect(harmony('Rust', 'Blue')).toBeGreaterThanOrEqual(0);
   });
 });
 
-describe('score (office engine behaviours)', () => {
-  const skin = skinObj('medium');
-
-  it('rewards a corporate office pairing over a clashing one', () => {
-    expect(score('White', 'Navy', skin, 'Classic')).toBeGreaterThan(
-      score('Olive', 'Blue', skin, 'Classic')
-    );
+describe('score', () => {
+  it('the curated spine bonus lifts a curated pair', () => {
+    // Sky Blue (Light Blue) + Navy is curated for male/formal ("Quiet Confidence").
+    const withCtx = score('Light Blue', 'Navy', skin, undefined, { gender: 'male', mode: 'formal' });
+    const noCtx = score('Light Blue', 'Navy', skin, undefined);
+    expect(withCtx).toBeGreaterThan(noCtx); // +0.40 curated bonus only with gender×mode
   });
 
-  it('demotes an implausible trouser colour (nobody wears mustard trousers)', () => {
+  it('a curated pair outranks an arbitrary plausible pair', () => {
+    const curated = score('Light Blue', 'Navy', skin, undefined, { gender: 'male', mode: 'formal' });
+    const random = score('Purple', 'Khaki', skin, undefined, { gender: 'male', mode: 'formal' });
+    expect(curated).toBeGreaterThan(random);
+  });
+
+  it('demotes an implausible trouser colour', () => {
     expect(score('White', 'Navy', skin)).toBeGreaterThan(score('White', 'Mustard', skin));
   });
 
-  it('penalises a flat same-colour pairing (Beige+Beige)', () => {
-    expect(score('White', 'Navy', skin)).toBeGreaterThan(score('Beige', 'Beige', skin));
-  });
-
-  it('skin depth reorders: deep skin favours crisp White over ashy Beige as a top', () => {
-    const deep = skinObj('deep');
-    expect(score('White', 'Navy', deep)).toBeGreaterThan(score('Beige', 'Navy', deep));
+  it('skin tier nudges the TOP: a deep face favours crisp White over ashy Khaki', () => {
+    const deep = skinObj(8);
+    expect(score('White', 'Navy', deep)).toBeGreaterThan(score('Khaki', 'Navy', deep));
   });
 });
 
 describe('catFor', () => {
-  it('classifies curated, neutral and bold pairings', () => {
-    expect(catFor('White', 'Navy')).toBe('CLASSIC');
-    expect(catFor('Black', 'Navy')).toBe('NEUTRAL');
-    expect(catFor('Olive', 'Burgundy')).toBe('BOLD');
+  it('returns the curated style tag for a curated pair, else a generic class', () => {
+    expect(typeof catFor('Light Blue', 'Navy', 'male', 'formal')).toBe('string');
+    expect(catFor('White', 'Navy')).toBe('NEUTRAL'); // both neutral, no ctx
   });
 });

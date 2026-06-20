@@ -3,7 +3,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { hx } from '@/engine';
 import { Icon } from '@/components/Icon';
 import { PanelShell } from '@/components/PanelShell';
-import { useStore } from '@/store/useStore';
+import { useActiveWardrobe, useStore } from '@/store/useStore';
 import { useUiStore } from '@/store/uiStore';
 import { fonts } from '@/theme/fonts';
 import { useTheme } from '@/theme/useTheme';
@@ -12,13 +12,16 @@ import { useTheme } from '@/theme/useTheme';
 export function SavedPanel() {
   const t = useTheme();
   const closePanel = useUiStore((s) => s.closePanel);
-  const saved = useStore((s) => s.saved);
-  const worn = useStore((s) => s.worn);
+  const setPane = useUiStore((s) => s.setPane);
+  const w = useActiveWardrobe();
+  const saved = w.saved;
+  const worn = w.worn;
   const deleteSaved = useStore((s) => s.deleteSaved);
   const loadCombo = useStore((s) => s.loadCombo);
 
   const open = (tk: string, bk: string) => {
     loadCombo(tk, bk);
+    setPane('rec'); // switch back to "Style me" so the loaded look is visible
     closePanel();
   };
 

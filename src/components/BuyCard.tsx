@@ -2,7 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { hx, shadeHex, type BuySuggestion } from '@/engine';
-import { useStore } from '@/store/useStore';
+import { useActiveWardrobe } from '@/store/useStore';
 import { fonts } from '@/theme/fonts';
 import { useMotion } from '@/theme/useMotion';
 import { useTheme } from '@/theme/useTheme';
@@ -17,8 +17,7 @@ interface Props {
 export function BuyCard({ suggestion, slot, index }: Props) {
   const t = useTheme();
   const motion = useMotion();
-  const shadeTops = useStore((s) => s.shadeTops);
-  const shadeBottoms = useStore((s) => s.shadeBottoms);
+  const { shadeTops, shadeBottoms } = useActiveWardrobe();
   const { c, pairs, fl } = suggestion;
   const shown = pairs.slice(0, 6);
   const extra = pairs.length - shown.length;
