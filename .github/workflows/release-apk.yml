@@ -1,0 +1,75 @@
+name: Build & Release APK
+
+# Push a tag like v1.0.1 -> builds a signed release APK and publishes it as a GitHub
+# Release (visible under "Releases" in the GitHub app). Manual runs (workflow_dispatch)
+# just build + upload the APK as a run artifact, without creating a Release.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write # required to create the Release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Decode release keystore
+        run: echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+
+      - name: Build signed release APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease \
+            -PappVersionName="${GITHUB_REF_NAME#v}" \
+            -PappVersionCode="${{ github.run_number }}" \
+            --no-daemon --stacktrace
+
+      - name: Stage APK
+        run: |
+          APK="$(find android/app/build/outputs/apk/release -name '*.apk' | head -1)"
+          echo "Found APK: $APK"
+          cp "$APK" "colorcloset-${GITHUB_REF_NAME}.apk"
+          ls -la colorcloset-*.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: colorcloset-apk
+          path: colorcloset-*.apk
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ColorCloset ${{ github.ref_name }}
+          files: colorcloset-*.apk
+          generate_release_notes: true
