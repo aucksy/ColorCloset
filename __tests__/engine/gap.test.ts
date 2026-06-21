@@ -33,4 +33,13 @@ describe('gapSuggestions ("what to buy")', () => {
     expect(asBottoms.find((s) => s.c === 'Mustard')).toBeUndefined();
     expect(asBottoms.find((s) => s.c === 'Purple')).toBeUndefined();
   });
+
+  it('does NOT suggest blue/light-blue trousers in formal (denim), but does in casual', () => {
+    const formal = gapSuggestions(['White', 'Navy'], ['Grey'], skin, G, 'formal');
+    expect(formal.asBottoms.find((s) => s.c === 'Blue')).toBeUndefined();
+    expect(formal.asBottoms.find((s) => s.c === 'Light Blue')).toBeUndefined();
+    const casual = gapSuggestions(['White', 'Navy'], ['Grey'], skin, G, 'casual');
+    // Blue is a valid casual trouser (jeans) — allowed to surface if it pairs well.
+    expect(casual.asBottoms.some((s) => s.c === 'Blue')).toBe(true);
+  });
 });

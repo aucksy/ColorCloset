@@ -12,7 +12,6 @@ import { useTheme } from '@/theme/useTheme';
 export function SavedPanel() {
   const t = useTheme();
   const closePanel = useUiStore((s) => s.closePanel);
-  const setPane = useUiStore((s) => s.setPane);
   const w = useActiveWardrobe();
   const saved = w.saved;
   const worn = w.worn;
@@ -20,8 +19,7 @@ export function SavedPanel() {
   const loadCombo = useStore((s) => s.loadCombo);
 
   const open = (tk: string, bk: string) => {
-    loadCombo(tk, bk);
-    setPane('rec'); // switch back to "Style me" so the loaded look is visible
+    loadCombo(tk, bk); // the main screen always shows the deck — just load + close
     closePanel();
   };
 

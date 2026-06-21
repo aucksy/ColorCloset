@@ -29,7 +29,8 @@ export type IconName =
   | 'trash'
   | 'cloud'
   | 'logout'
-  | 'thumbs-down';
+  | 'thumbs-down'
+  | 'bag';
 
 function paths(name: IconName, c: string, sw: number): ReactNode {
   const p = (d: string, fill = 'none') => (
@@ -99,6 +100,8 @@ function paths(name: IconName, c: string, sw: number): ReactNode {
       return p('M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3');
     case 'thumbs-down':
       return p('M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17');
+    case 'bag':
+      return p('M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0');
   }
 }
 

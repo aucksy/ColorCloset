@@ -375,11 +375,6 @@ exports[`golden: female formal gap suggestions are stable 1`] = `
       "fl": false,
       "n": 7,
     },
-    {
-      "c": "Blue",
-      "fl": true,
-      "n": 4,
-    },
   ],
   "asTops": [
     {
@@ -1078,11 +1073,6 @@ exports[`golden: male formal gap suggestions are stable 1`] = `
       "c": "Cream",
       "fl": false,
       "n": 7,
-    },
-    {
-      "c": "Blue",
-      "fl": true,
-      "n": 4,
     },
   ],
   "asTops": [

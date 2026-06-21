@@ -6,34 +6,42 @@ import { fonts } from '@/theme/fonts';
 import { useMotion } from '@/theme/useMotion';
 import { useTheme } from '@/theme/useTheme';
 
-export type Pane = 'rec' | 'shop';
-
-interface Props {
-  value: Pane;
-  onChange: (p: Pane) => void;
+export interface SegOption<T extends string> {
+  value: T;
+  label: string;
 }
 
-export function Segmented({ value, onChange }: Props) {
+interface Props<T extends string> {
+  value: T;
+  /** Exactly two options (left, right). */
+  options: readonly [SegOption<T>, SegOption<T>];
+  onChange: (v: T) => void;
+}
+
+/** A two-tab segmented control with a sliding gold thumb. Generic over the value type. */
+export function Segmented<T extends string>({ value, options, onChange }: Props<T>) {
   const t = useTheme();
   const motion = useMotion();
   const [w, setW] = useState(0);
   const thumbW = w > 0 ? (w - 8) / 2 : 0;
+  const onRight = value === options[1].value;
 
   const thumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: withTiming(value === 'shop' ? thumbW : 0, { duration: motion.fast }) }],
+    transform: [{ translateX: withTiming(onRight ? thumbW : 0, { duration: motion.fast }) }],
   }));
 
-  const tab = (pane: Pane, label: string) => {
-    const on = value === pane;
+  const tab = (opt: SegOption<T>) => {
+    const on = value === opt.value;
     return (
       <Pressable
+        key={opt.value}
         accessibilityRole="tab"
         accessibilityState={{ selected: on }}
-        onPress={() => onChange(pane)}
+        onPress={() => onChange(opt.value)}
         style={styles.tab}
       >
         <Text style={[styles.label, { color: on ? t.onGold : t.muted, fontFamily: fonts.uiSemi }]}>
-          {label}
+          {opt.label}
         </Text>
       </Pressable>
     );
@@ -49,8 +57,8 @@ export function Segmented({ value, onChange }: Props) {
           <LinearGradient colors={t.goldGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
         </Animated.View>
       )}
-      {tab('rec', 'Style me')}
-      {tab('shop', 'Colors to buy')}
+      {tab(options[0])}
+      {tab(options[1])}
     </View>
   );
 }

@@ -1,16 +1,13 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInLeft, SlideOutLeft, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, SlideInLeft, SlideOutLeft } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GENDER_LABEL, MODE_LABEL, type Mode, skinObj, uniStats } from '@/engine';
+import { GENDER_LABEL, MODE_LABEL, skinObj, uniStats } from '@/engine';
 import { Icon, type IconName } from '@/components/Icon';
 import { Logo } from '@/components/Logo';
 import { useActiveWardrobe, useStore } from '@/store/useStore';
 import { useUiStore } from '@/store/uiStore';
 import { fonts } from '@/theme/fonts';
-import { useMotion } from '@/theme/useMotion';
 import { useTheme } from '@/theme/useTheme';
 
 export function SideMenu() {
@@ -25,7 +22,6 @@ export function SideMenu() {
   const toggleTheme = useStore((s) => s.toggleTheme);
   const gender = useStore((s) => s.gender);
   const mode = useStore((s) => s.mode);
-  const setMode = useStore((s) => s.setMode);
   const mst = useStore((s) => s.mst);
   const resetWardrobe = useStore((s) => s.resetWardrobe);
 
@@ -83,9 +79,8 @@ export function SideMenu() {
           </Text>
         )}
 
-        <ModeToggle t={t} value={mode} onChange={setMode} />
-
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 12 }}>
+          <Item t={t} icon="bag" label="Colours to buy" onPress={() => openPanel('buy')} highlight />
           <Item t={t} icon="grid" label="Add more colours" onPress={addColours} />
           <Item t={t} icon="list" label="Your rotation" onPress={() => openPanel('combos')} right={`${wornCount}/${total}`} />
           <Item t={t} icon="heart" label="Saved looks" onPress={() => openPanel('saved')} right={String(w.saved.length)} />
@@ -99,7 +94,7 @@ export function SideMenu() {
           <Item t={t} icon="setup" label="Set up again" onPress={setupAgain} />
           <Item t={t} icon="download" label="Backup & restore" onPress={() => openPanel('backup')} />
           <Item t={t} icon="info" label="How it works" onPress={() => openPanel('about')} />
-          <Item t={t} icon="star" label="Colour science" onPress={() => openPanel('sources')} highlight />
+          <Item t={t} icon="star" label="Colour science" onPress={() => openPanel('sources')} highlight badge="NEW" />
           <Item t={t} icon="reset" label="Reset wardrobe" onPress={reset} />
 
           <Text style={[styles.foot, { color: t.faint, fontFamily: fonts.uiRegular }]}>
@@ -111,48 +106,6 @@ export function SideMenu() {
   );
 }
 
-/** Inline 2-segment Formal/Casual toggle — mirrors the app's `Segmented` look. */
-function ModeToggle({ t, value, onChange }: { t: ReturnType<typeof useTheme>; value: Mode; onChange: (m: Mode) => void }) {
-  const motion = useMotion();
-  const [w, setW] = useState(0);
-  const thumbW = w > 0 ? (w - 8) / 2 : 0;
-
-  const thumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: withTiming(value === 'casual' ? thumbW : 0, { duration: motion.fast }) }],
-  }));
-
-  const tab = (m: Mode) => {
-    const on = value === m;
-    return (
-      <Pressable
-        accessibilityRole="tab"
-        accessibilityState={{ selected: on }}
-        onPress={() => onChange(m)}
-        style={styles.modeTab}
-      >
-        <Text style={[styles.modeLabel, { color: on ? t.onGold : t.muted, fontFamily: fonts.uiSemi }]}>
-          {MODE_LABEL[m]}
-        </Text>
-      </Pressable>
-    );
-  };
-
-  return (
-    <View
-      style={[styles.modeSeg, { backgroundColor: t.glass, borderColor: t.line }]}
-      onLayout={(e) => setW(e.nativeEvent.layout.width)}
-    >
-      {thumbW > 0 && (
-        <Animated.View style={[styles.modeThumb, { width: thumbW }, thumbStyle]}>
-          <LinearGradient colors={t.goldGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-        </Animated.View>
-      )}
-      {tab('formal')}
-      {tab('casual')}
-    </View>
-  );
-}
-
 function Item({
   t,
   icon,
@@ -160,14 +113,17 @@ function Item({
   onPress,
   right,
   highlight,
+  badge,
 }: {
   t: ReturnType<typeof useTheme>;
   icon: IconName;
   label: string;
   onPress: () => void;
   right?: string;
-  /** Draw attention to a new/important entry (accent icon + tint + NEW badge). */
+  /** Draw attention to an important entry (accent icon + tint). */
   highlight?: boolean;
+  /** Optional small pill on the right (e.g. "NEW"). Independent of `highlight`. */
+  badge?: string;
 }) {
   return (
     <Pressable
@@ -182,9 +138,9 @@ function Item({
       <Text style={[styles.itemTxt, { color: t.ink, fontFamily: highlight ? fonts.uiSemi : fonts.ui }]}>{label}</Text>
       {right != null ? (
         <Text style={[styles.right, { color: t.muted, fontFamily: fonts.uiSemi }]}>{right}</Text>
-      ) : highlight ? (
+      ) : badge ? (
         <View style={[styles.newBadge, { backgroundColor: t.accent }]}>
-          <Text style={[styles.newTxt, { color: t.onGold, fontFamily: fonts.monoBold }]}>NEW</Text>
+          <Text style={[styles.newTxt, { color: t.onGold, fontFamily: fonts.monoBold }]}>{badge}</Text>
         </View>
       ) : null}
     </Pressable>
@@ -231,11 +187,7 @@ const styles = StyleSheet.create({
   },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, paddingBottom: 8 },
   brandTxt: { fontSize: 17 },
-  caption: { paddingHorizontal: 8, paddingBottom: 12, fontSize: 11.5, letterSpacing: 0.3 },
-  modeSeg: { flexDirection: 'row', borderRadius: 14, borderWidth: 1, padding: 4, marginHorizontal: 6, marginBottom: 14 },
-  modeThumb: { position: 'absolute', top: 4, bottom: 4, left: 4, borderRadius: 10, overflow: 'hidden' },
-  modeTab: { flex: 1, paddingVertical: 9, alignItems: 'center', zIndex: 1 },
-  modeLabel: { fontSize: 13 },
+  caption: { paddingHorizontal: 8, paddingBottom: 14, fontSize: 11.5, letterSpacing: 0.3 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 12, borderRadius: 14 },
   itemTxt: { fontSize: 14.5 },
   right: { marginLeft: 'auto', fontSize: 12 },

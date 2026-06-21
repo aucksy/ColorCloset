@@ -1,9 +1,9 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { STYLES, buildDeck, skinObj, type StyleName } from '@/engine';
+import { STYLES, buildDeck, comboUniverse, skinObj, type Mode, type StyleName } from '@/engine';
 import { Button } from '@/components/Button';
 import { ChipRow } from '@/components/ChipRow';
 import { Icon } from '@/components/Icon';
@@ -12,9 +12,9 @@ import { Segmented } from '@/components/Segmented';
 import { SideMenu } from '@/components/SideMenu';
 import { SwipeDeck } from '@/components/SwipeDeck';
 import { Toast } from '@/components/Toast';
-import { WhatToBuyPane } from '@/components/WhatToBuyPane';
 import { AboutPanel } from '@/components/panels/AboutPanel';
 import { BackupPanel } from '@/components/panels/BackupPanel';
+import { BuyPanel } from '@/components/panels/BuyPanel';
 import { CombinationsPanel } from '@/components/panels/CombinationsPanel';
 import { ReminderPanel } from '@/components/panels/ReminderPanel';
 import { SavedPanel } from '@/components/panels/SavedPanel';
@@ -32,6 +32,12 @@ const hashDay = (s: string) => {
   return h;
 };
 
+// Top toggle is now Formal / Casual (the active wardrobe mode).
+const MODE_OPTIONS = [
+  { value: 'formal' as Mode, label: 'Formal' },
+  { value: 'casual' as Mode, label: 'Casual' },
+] as const;
+
 export default function Main() {
   const t = useTheme();
   const router = useRouter();
@@ -46,6 +52,7 @@ export default function Main() {
   const mst = useStore((s) => s.mst);
   const gender = useStore((s) => s.gender);
   const mode = useStore((s) => s.mode);
+  const setMode = useStore((s) => s.setMode);
   const regenerate = useStore((s) => s.regenerate);
   const next = useStore((s) => s.next);
   const prev = useStore((s) => s.prev);
@@ -61,9 +68,6 @@ export default function Main() {
   // All wardrobe data + history reads the ACTIVE gender×mode bucket.
   const w = useActiveWardrobe();
 
-  // Pane lives in uiStore so the rotation/saved panels can switch back to "Style me".
-  const pane = useUiStore((s) => s.pane);
-  const setPane = useUiStore((s) => s.setPane);
   const openDrawer = useUiStore((s) => s.openDrawer);
   const closePanel = useUiStore((s) => s.closePanel);
   const drawerOpen = useUiStore((s) => s.drawerOpen);
@@ -71,7 +75,7 @@ export default function Main() {
   const showToast = useUiStore((s) => s.showToast);
   const panel = useUiStore((s) => s.panel);
 
-  // The browsable deck (excludes "not for me") — drives the counter + worn progress.
+  // The browsable deck for the SELECTED style (excludes "not for me").
   const deck = useMemo(
     () =>
       buildDeck({ tops: w.tops, bottoms: w.bottoms, skin: skinObj(mst), style, gender, mode }).filter(
@@ -79,26 +83,35 @@ export default function Main() {
       ),
     [w.tops, w.bottoms, w.dismissed, mst, style, gender, mode]
   );
-  const total = deck.length;
-  const wornCount = useMemo(() => deck.filter((c) => w.worn[c.id]).length, [deck, w.worn]);
+  const total = deck.length; // current style's deck size (for in-style position + last-card detection)
 
-  // Per-style browsable deck size (post "not for me"), so onNext can hop to the next
-  // non-empty style once the current style's cards are exhausted (#15 auto-advance).
-  const styleLen = useMemo(
-    () =>
-      STYLES.reduce((m, s) => {
-        m[s] = buildDeck({
-          tops: w.tops,
-          bottoms: w.bottoms,
-          skin: skinObj(mst),
-          style: s,
-          gender,
-          mode,
-        }).filter((c) => !w.dismissed[c.id]).length;
-        return m;
-      }, {} as Record<StyleName, number>),
-    [w.tops, w.bottoms, w.dismissed, mst, gender, mode]
-  );
+  // GLOBAL stats across ALL styles in the active bucket — the counter and the "worn them
+  // all" prompt are GLOBAL, not per-style: per-style deck size + worn count, plus totals.
+  const { styleLen, styleWorn, grandTotal, grandWorn } = useMemo(() => {
+    const len = STYLES.reduce((m, s) => ((m[s] = 0), m), {} as Record<StyleName, number>);
+    const wn = STYLES.reduce((m, s) => ((m[s] = 0), m), {} as Record<StyleName, number>);
+    comboUniverse(w.tops, w.bottoms, skinObj(mst), gender, mode).forEach((c) => {
+      if (w.dismissed[c.id]) return;
+      len[c.style] += 1;
+      if (w.worn[c.id]) wn[c.style] += 1;
+    });
+    return {
+      styleLen: len,
+      styleWorn: wn,
+      grandTotal: STYLES.reduce((n, s) => n + len[s], 0),
+      grandWorn: STYLES.reduce((n, s) => n + wn[s], 0),
+    };
+  }, [w.tops, w.bottoms, w.dismissed, w.worn, mst, gender, mode]);
+
+  // Global position of the current card = combos in earlier styles + position within this style.
+  const styleOffset = STYLES.slice(0, Math.max(0, STYLES.indexOf(style))).reduce((n, s) => n + styleLen[s], 0);
+  const globalPos = grandTotal === 0 ? 0 : styleOffset + (deckPos < 0 ? 0 : deckPos) + 1;
+
+  // Cyclic next style (from `from`) that still has any / unworn looks — for auto-advance.
+  const nextStyleWith = (from: StyleName, pred: (s: StyleName) => boolean): StyleName | undefined => {
+    const i = STYLES.indexOf(from);
+    return STYLES.slice(i + 1).concat(STYLES.slice(0, i)).find(pred);
+  };
 
   // First entry: seed a decisive "Today's pick" once a day (a strong, day-stable look).
   useLayoutEffect(() => {
@@ -124,14 +137,10 @@ export default function Main() {
         closeDrawer();
         return true;
       }
-      if (pane === 'shop') {
-        setPane('rec');
-        return true;
-      }
       return false;
     });
     return () => sub.remove();
-  }, [panel, drawerOpen, closePanel, closeDrawer, pane, setPane]);
+  }, [panel, drawerOpen, closePanel, closeDrawer]);
 
   const isSaved = !!current && w.saved.some((x) => x.t === current.t && x.b === current.b);
 
@@ -142,7 +151,7 @@ export default function Main() {
   const coachShown = useRef(false);
   useEffect(() => {
     if (coachSeen || coachShown.current) return;
-    if (pane !== 'rec' || !current || swipes < 2) return;
+    if (!current || swipes < 2) return;
     // Latch the one-shot guard only when it ACTUALLY shows, so an interrupted timer
     // reschedules rather than permanently suppressing the coachmark.
     const showId = setTimeout(() => {
@@ -150,7 +159,7 @@ export default function Main() {
       setCoachVisible(true);
     }, 400);
     return () => clearTimeout(showId);
-  }, [coachSeen, pane, current, swipes]);
+  }, [coachSeen, current, swipes]);
 
   // Auto-dismiss the coachmark after a few seconds once it's on screen.
   useEffect(() => {
@@ -167,33 +176,28 @@ export default function Main() {
     markCoachSeen();
   };
 
-  // Offer to reset worn history once everything's been worn.
+  // Offer to reset worn history once EVERY combo (all styles) has been worn — global, not
+  // per-style — via a themed in-app dialog (not the OS Alert).
+  const [showWornAll, setShowWornAll] = useState(false);
   const prompted = useRef(false);
   useEffect(() => {
-    const allWorn = total > 0 && wornCount >= total;
+    const allWorn = grandTotal > 0 && grandWorn >= grandTotal;
     if (allWorn && !prompted.current) {
       prompted.current = true;
-      Alert.alert('You’ve worn them all', `That’s all ${total} combinations. Reset your worn history to start a fresh round?`, [
-        { text: 'Not now', style: 'cancel' },
-        { text: 'Reset worn', style: 'destructive', onPress: () => { setOnToday(false); clearWorn(); regenerate(); } },
-      ]);
+      setShowWornAll(true);
     }
     if (!allWorn) prompted.current = false;
-  }, [wornCount, total, clearWorn, regenerate]);
+  }, [grandWorn, grandTotal]);
 
   const onStyle = (s: StyleName) => { setOnToday(false); setStyle(s); };
   const onNext = () => {
     setOnToday(false);
     setSwipes((n) => n + 1);
     // On the last card of this style, hop to the next non-empty style (cyclic via STYLES
-    // order from the current one) instead of wrapping — so swiping flows across styles.
+    // order) so swiping flows across styles and loops back instead of dead-ending.
     if (total > 0 && deckPos >= total - 1) {
-      const i = STYLES.indexOf(style);
-      const nextStyle =
-        i >= 0
-          ? STYLES.slice(i + 1).concat(STYLES.slice(0, i)).find((s) => styleLen[s] > 0)
-          : undefined;
-      if (nextStyle) {
+      const nextStyle = nextStyleWith(style, (s) => styleLen[s] > 0);
+      if (nextStyle && nextStyle !== style) {
         setStyle(nextStyle);
         showToast(`That's all your ${style} looks — showing ${nextStyle}`);
         return;
@@ -202,7 +206,19 @@ export default function Main() {
     next();
   };
   const onPrev = () => { setOnToday(false); setSwipes((n) => n + 1); prev(); };
-  const onWore = () => { setOnToday(false); markWorn(); showToast("Marked worn — here's a fresh one"); };
+  const onWore = () => {
+    setOnToday(false);
+    // Was this the last UNWORN look in the current style? (decide before marking)
+    const lastInStyle = styleLen[style] - styleWorn[style] <= 1;
+    markWorn();
+    const ns = lastInStyle ? nextStyleWith(style, (s) => styleLen[s] - styleWorn[s] > 0) : undefined;
+    if (ns && ns !== style) {
+      setStyle(ns);
+      showToast(`Worn all your ${style} looks — showing ${ns}`);
+    } else {
+      showToast("Marked worn — here's a fresh one");
+    }
+  };
   const onDismiss = () => { setOnToday(false); dismiss(); showToast('Hidden — find it under “Not for me”'); };
   const onSave = (): boolean => {
     if (isSaved) {
@@ -216,6 +232,11 @@ export default function Main() {
 
   // Casual lazy onboarding: an empty casual bucket gets mode-aware copy/CTA.
   const isEmptyCasual = mode === 'casual' && w.tops.length === 0 && w.bottoms.length === 0;
+  // Mode-aware noun for empty-state copy (no more hard-coded "office").
+  const lookWord = mode === 'casual' ? 'casual' : 'office';
+  // The selected style has no looks, but the bucket has combos in other styles (#5).
+  const isEmptyStyle = !current && grandTotal > 0 && styleLen[style] === 0;
+  const addColours = () => router.push({ pathname: '/onboarding', params: { mode: 'add' } });
 
   return (
     <View style={[styles.root, { backgroundColor: t.bg, paddingTop: insets.top }]}>
@@ -233,14 +254,14 @@ export default function Main() {
       </View>
 
       <View style={{ paddingHorizontal: 18, marginTop: 6 }}>
-        <Segmented value={pane} onChange={setPane} />
+        <Segmented value={mode} options={MODE_OPTIONS} onChange={setMode} />
       </View>
 
       {/* sticky status — always visible without scrolling */}
-      {pane === 'rec' && current && (
+      {current && (
         <View style={styles.status}>
           <Text style={[styles.counter, { color: t.muted, fontFamily: fonts.monoBold }]}>
-            <Text style={{ color: t.accent }}>{(deckPos < 0 ? 0 : deckPos) + 1}</Text> of {total}
+            <Text style={{ color: t.accent }}>{globalPos}</Text> of {grandTotal}
           </Text>
           {onToday ? (
             <View style={[styles.todayPill, { borderColor: t.accent, backgroundColor: 'rgba(201,168,106,0.12)' }]}>
@@ -254,17 +275,29 @@ export default function Main() {
       )}
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 12, paddingBottom: insets.bottom + (pane === 'rec' && current ? 104 : 40) }}
+        contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 12, paddingBottom: insets.bottom + (current ? 104 : 40) }}
         showsVerticalScrollIndicator={false}
       >
-        {pane === 'rec' ? (
-          <Animated.View key="rec" entering={FadeIn.duration(motion.fast)}>
-            <Text style={[styles.chLabel, { color: t.faint, fontFamily: fonts.mono }]}>STYLE</Text>
-            <ChipRow items={STYLES.map((s) => ({ value: s as StyleName, label: s }))} value={style} onChange={onStyle} />
+        <Animated.View key="rec" entering={FadeIn.duration(motion.fast)}>
+          <Text style={[styles.chLabel, { color: t.faint, fontFamily: fonts.mono }]}>STYLE</Text>
+          <ChipRow items={STYLES.map((s) => ({ value: s as StyleName, label: s }))} value={style} onChange={onStyle} />
 
             <View style={{ marginTop: 12 }}>
               {current ? (
                 <SwipeDeck pos={deckPos} total={total} onNext={onNext} onPrev={onPrev} onSave={onSave} />
+              ) : isEmptyStyle ? (
+                <View style={styles.emptyRec}>
+                  <View style={[styles.emptyIc, { backgroundColor: t.glass, borderColor: t.line }]}>
+                    <Icon name="grid" size={24} color={t.accent} />
+                  </View>
+                  <Text style={[styles.emptyH, { color: t.ink, fontFamily: fonts.display }]}>No {style} looks yet</Text>
+                  <Text style={[styles.emptyP, { color: t.muted, fontFamily: fonts.uiRegular }]}>
+                    Add more colours to start seeing {lookWord} looks for this style — or try another style above.
+                  </Text>
+                  <View style={styles.emptyBtn}>
+                    <Button title="Add colours" variant="goldline" onPress={addColours} />
+                  </View>
+                </View>
               ) : isEmptyCasual ? (
                 <View style={styles.emptyRec}>
                   <View style={[styles.emptyIc, { backgroundColor: t.glass, borderColor: t.line }]}>
@@ -275,7 +308,7 @@ export default function Main() {
                     Add the colours you wear casually.
                   </Text>
                   <View style={styles.emptyBtn}>
-                    <Button title="Add casual colours" variant="goldline" onPress={() => router.push({ pathname: '/onboarding', params: { mode: 'add' } })} />
+                    <Button title="Add casual colours" variant="goldline" onPress={addColours} />
                   </View>
                 </View>
               ) : (
@@ -285,24 +318,19 @@ export default function Main() {
                   </View>
                   <Text style={[styles.emptyH, { color: t.ink, fontFamily: fonts.display }]}>No combinations yet</Text>
                   <Text style={[styles.emptyP, { color: t.muted, fontFamily: fonts.uiRegular }]}>
-                    Add a few colours to your wardrobe to start seeing office looks.
+                    Add a few colours to your wardrobe to start seeing {lookWord} looks.
                   </Text>
                   <View style={styles.emptyBtn}>
-                    <Button title="Add colours" variant="goldline" onPress={() => router.push({ pathname: '/onboarding', params: { mode: 'add' } })} />
+                    <Button title="Add colours" variant="goldline" onPress={addColours} />
                   </View>
                 </View>
               )}
-            </View>
-          </Animated.View>
-        ) : (
-          <Animated.View key="shop" entering={FadeIn.duration(motion.fast)}>
-            <WhatToBuyPane />
-          </Animated.View>
-        )}
+          </View>
+        </Animated.View>
       </ScrollView>
 
       {/* dismissible coachmark — appears once after the user has swiped a couple of cards */}
-      {pane === 'rec' && current && coachVisible && (
+      {current && coachVisible && (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Got it"
@@ -320,7 +348,7 @@ export default function Main() {
       )}
 
       {/* always-visible action bar: not-for-me · save · mark worn */}
-      {pane === 'rec' && current && (
+      {current && (
         <View style={[styles.bar, { backgroundColor: t.bg, borderTopColor: t.line, paddingBottom: insets.bottom + 10 }]}>
           <Pressable accessibilityRole="button" accessibilityLabel="Not for me" onPress={onDismiss} style={[styles.iconAct, { borderColor: t.line2 }]}>
             <Icon name="thumbs-down" size={20} color={t.muted} strokeWidth={2} />
@@ -345,6 +373,34 @@ export default function Main() {
       {panel === 'reminder' && <ReminderPanel />}
       {panel === 'backup' && <BackupPanel />}
       {panel === 'sources' && <SourcesPanel />}
+      {panel === 'buy' && <BuyPanel />}
+
+      {/* themed "worn them all" dialog (replaces the OS Alert) — global, all styles worn */}
+      {showWornAll && (
+        <View style={[StyleSheet.absoluteFill, styles.modalWrap]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+            onPress={() => setShowWornAll(false)}
+            style={[StyleSheet.absoluteFill, styles.modalScrim]}
+          />
+          <Animated.View entering={FadeInDown.duration(motion.base)} style={[styles.modalCard, { backgroundColor: t.surface, borderColor: t.line2 }]}>
+            <Text style={[styles.modalTitle, { color: t.ink, fontFamily: fonts.display }]}>You’ve worn them all</Text>
+            <Text style={[styles.modalBody, { color: t.muted, fontFamily: fonts.uiRegular }]}>
+              That’s all {grandTotal} of your {lookWord} looks. Reset your worn history to start a fresh round?
+            </Text>
+            <View style={styles.modalBtns}>
+              <Pressable onPress={() => setShowWornAll(false)} style={({ pressed }) => [styles.modalGhost, { borderColor: t.line2, opacity: pressed ? 0.6 : 1 }]}>
+                <Text style={[styles.modalGhostTxt, { color: t.muted, fontFamily: fonts.uiSemi }]}>Not now</Text>
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Button title="Reset worn" onPress={() => { setOnToday(false); clearWorn(); regenerate(); setShowWornAll(false); }} />
+              </View>
+            </View>
+          </Animated.View>
+        </View>
+      )}
+
       <SideMenu />
       <Toast />
     </View>
@@ -373,4 +429,12 @@ const styles = StyleSheet.create({
   emptyH: { fontSize: 19, marginBottom: 7, textAlign: 'center' },
   emptyP: { fontSize: 13, lineHeight: 20, textAlign: 'center', maxWidth: 250 },
   emptyBtn: { alignSelf: 'stretch', paddingHorizontal: 50, marginTop: 18 },
+  modalWrap: { alignItems: 'center', justifyContent: 'center', zIndex: 80, paddingHorizontal: 30 },
+  modalScrim: { backgroundColor: 'rgba(5,5,8,0.6)' },
+  modalCard: { borderWidth: 1, borderRadius: 22, padding: 22, width: '100%', maxWidth: 360 },
+  modalTitle: { fontSize: 22, marginBottom: 8 },
+  modalBody: { fontSize: 13.5, lineHeight: 20, marginBottom: 18 },
+  modalBtns: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  modalGhost: { borderWidth: 1, borderRadius: 14, paddingVertical: 13, paddingHorizontal: 18 },
+  modalGhostTxt: { fontSize: 14 },
 });

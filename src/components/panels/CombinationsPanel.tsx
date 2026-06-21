@@ -13,7 +13,6 @@ import { useTheme } from '@/theme/useTheme';
 export function CombinationsPanel() {
   const t = useTheme();
   const closePanel = useUiStore((s) => s.closePanel);
-  const setPane = useUiStore((s) => s.setPane);
   const w = useActiveWardrobe();
   const mst = useStore((s) => s.mst);
   const gender = useStore((s) => s.gender);
@@ -35,8 +34,7 @@ export function CombinationsPanel() {
   const wornCount = did.length;
 
   const open = (c: Combo) => {
-    loadCombo(c.t, c.b);
-    setPane('rec'); // switch to "Style me" so the loaded combo is visible
+    loadCombo(c.t, c.b); // the main screen always shows the deck — just load + close
     closePanel();
   };
 

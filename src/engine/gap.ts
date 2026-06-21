@@ -19,6 +19,13 @@ import type { BuySuggestion, ColorKey, Gender, Mode, SkinObj, StyleName } from '
 /** A colour must be at least this plausible as trousers to be suggested as a bottom. */
 const MIN_BOTTOM_SUITABILITY = 0.35;
 
+/**
+ * Denim-only trouser colours — nobody buys blue/light-blue FORMAL trousers (those read as
+ * jeans). They're fine in casual, so we only exclude them from bottom suggestions in
+ * formal mode. (We don't touch already-owned bottoms — this is purely about what to BUY.)
+ */
+const CASUAL_ONLY_BOTTOMS = new Set<ColorKey>(['Blue', 'Light Blue']);
+
 export interface GapResult {
   /** Colours to add as tops (each pairs with existing bottoms). */
   asTops: BuySuggestion[];
@@ -60,8 +67,10 @@ export function gapSuggestions(
   KEYS.forEach((c) => {
     const fl = skin ? skin.flatterTops.includes(c) : false;
 
-    // Only suggest a colour as a BOTTOM if it's a realistic trouser colour.
-    if (!ownB.has(c) && bottomScore(c) >= MIN_BOTTOM_SUITABILITY) {
+    // Only suggest a colour as a BOTTOM if it's a realistic trouser colour for this mode
+    // (no blue/light-blue "formal" trousers — those are denim, a casual-only suggestion).
+    const denimInFormal = mode === 'formal' && CASUAL_ONLY_BOTTOMS.has(c);
+    if (!ownB.has(c) && !denimInFormal && bottomScore(c) >= MIN_BOTTOM_SUITABILITY) {
       const pairs: ColorKey[] = [];
       tops.forEach((t) => {
         // Never count a suppressed (or off-style) pairing as a reason to buy.
