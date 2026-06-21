@@ -79,6 +79,7 @@ interface PersistedState {
   style: StyleName;
   swipeHintSeen: boolean;
   coachSeen: boolean; // the double-tap-to-save coachmark
+  welcomeSeen: boolean; // the first-launch feature-intro carousel
   notify: NotifySettings;
   setupComplete: boolean;
   drive: DriveState;
@@ -113,6 +114,7 @@ interface Actions {
   setStyle: (s: StyleName) => void;
   markSwipeHintSeen: () => void;
   markCoachSeen: () => void;
+  markWelcomeSeen: () => void;
   setNotify: (patch: Partial<NotifySettings>) => void;
   // saved / worn
   saveCurrent: () => void;
@@ -168,6 +170,7 @@ const PERSISTED_DEFAULTS: PersistedState = {
   style: 'Minimal',
   swipeHintSeen: false,
   coachSeen: false,
+  welcomeSeen: false,
   notify: { enabled: false, hour: 9, minute: 0, days: [1, 2, 3, 4, 5, 6, 7] },
   setupComplete: false,
   drive: { email: null, lastBackup: null, auto: false },
@@ -436,6 +439,7 @@ export const useStore = create<Store>()(
       },
       markSwipeHintSeen: () => set({ swipeHintSeen: true }),
       markCoachSeen: () => set({ coachSeen: true }),
+      markWelcomeSeen: () => set({ welcomeSeen: true }),
       setNotify: (patch) => set({ notify: { ...get().notify, ...patch } }),
 
       saveCurrent: () => {
@@ -472,6 +476,7 @@ export const useStore = create<Store>()(
           theme: s.theme, // keep preferences through a wardrobe reset
           swipeHintSeen: s.swipeHintSeen,
           coachSeen: s.coachSeen,
+          welcomeSeen: s.welcomeSeen, // don't replay the intro after a reset
           notify: s.notify,
           drive: s.drive, // keep the Drive session/settings; only wardrobe data is cleared
         });
@@ -598,6 +603,7 @@ export const useStore = create<Store>()(
             style: isStyle(persisted.style) ? persisted.style : 'Minimal',
             swipeHintSeen: !!persisted.swipeHintSeen,
             coachSeen: false,
+            welcomeSeen: true, // existing v5 users have already set up — skip the intro
             notify: persisted.notify ?? PERSISTED_DEFAULTS.notify,
             setupComplete: !!persisted.setupComplete,
             drive: persisted.drive ?? PERSISTED_DEFAULTS.drive,
@@ -615,6 +621,7 @@ export const useStore = create<Store>()(
         style: s.style,
         swipeHintSeen: s.swipeHintSeen,
         coachSeen: s.coachSeen,
+        welcomeSeen: s.welcomeSeen,
         notify: s.notify,
         setupComplete: s.setupComplete,
         drive: s.drive,

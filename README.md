@@ -1,70 +1,115 @@
+<div align="center">
+
 # ColorCloset
 
-> Get dressed in seconds, from the clothes you already own.
+**What to wear to the office — built from the colours you already own.**
 
-A calm, single-purpose mobile app (React Native + Expo, TypeScript) that suggests
-outfit **colour combinations** from the colours you own — ranked by colour harmony,
-what flatters your skin tone, occasion, and a style lean. Ported from the validated
-web prototype in `../Product Docs/`.
+[![Build & Release APK](https://github.com/aucksy/ColorCloset/actions/workflows/release-apk.yml/badge.svg)](https://github.com/aucksy/ColorCloset/actions/workflows/release-apk.yml)
+[![Latest release](https://img.shields.io/github/v/release/aucksy/ColorCloset?label=latest%20apk&sort=semver)](https://github.com/aucksy/ColorCloset/releases/latest)
+[![Expo SDK 56](https://img.shields.io/badge/Expo-SDK%2056-000?logo=expo)](https://docs.expo.dev/versions/v56.0.0/)
+[![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)](#)
 
-## Status — Passes 1–2: full v1 experience
+A calm, editorial Android app that turns the colours in your wardrobe into a swipeable
+deck of office (and casual) outfit pairings — tuned to your skin tone and grounded in real
+colour science, not guesswork.
 
-**Built & verified**
+</div>
 
-- **Colour-intelligence engine** (`src/engine/`) — pure, deterministic, dependency-free
-  TypeScript port of the prototype: 16-colour model + shades, harmony, skin-tone
-  flatter sets, occasion/style scoring, the combination universe (threshold 0.55),
-  the "Another" deck walk, and the gap engine (threshold 0.62). All weights are the
-  prototype's exact values. **45 unit + parity tests pass** (`npm test`).
-- **Onboarding** (manual colour palette) — skin tone (depth + undertone) → tops →
-  bottoms, with per-colour shade selection. *(Photo extraction is deferred to v1.1;
-  the manual path is always available per the PRD.)*
-- **Building screen** — animated count-up to the true number of combinations.
-- **Style Me core loop** — outfit card (animated garment silhouettes, name, "why this
-  works", flatter + last-worn pills), Occasion & Style chip rows, **Another** /
-  **Save** / **Mark it worn**, and a "Worn X of Y" progress indicator.
-- **What to buy** — the gap-engine UI: ranked colours to add as tops/bottoms, each
-  card showing the exact existing pieces (and outfit previews) the new colour unlocks.
-- **Label by type** — tag colours casual/formal/gym; a "For" filter then narrows the
-  Style Me walk (untagged colours always pass).
-- **Side menu + panels** — skin-tone picker, combinations list, saved looks,
-  how-it-works, dark/light theme toggle (dark default), set-up-again, reset wardrobe.
-- **Local persistence** (AsyncStorage via a swappable storage adapter — MMKV-ready).
-- **Fluid motion** — outfit cross-fade with garment colour-morph, pane fades, animated
-  progress, staggered buy-cards, onboarding step fades; all honour reduce-motion.
-- **Smaller APK** — only the used font weights are bundled, and native libraries are
-  built for `arm64-v8a` only (see `plugins/withAndroidAbiFilter.js`).
+---
 
-**Deferred to follow-up passes** — on-device photo extraction (v1.1), worn-photo
-history, outerwear slot, analytics, the optional MMKV storage swap, and ProGuard/R8
-minification (runtime-test before enabling). For a Play Store release, build the
-`production` profile (an `.aab`), which makes the arm64-only filter unnecessary.
+## ✨ Features
 
-## Running it
+- **Style me** — a Tinder‑style deck of colour pairings built *only* from the colours you own.
+  Swipe to browse, double‑tap to save, mark looks worn, hide the ones that aren't for you.
+- **Four wardrobes** — Men & Women × Formal & Casual, each with its own colours, history and
+  recommendations. Switch Formal/Casual right from the top bar.
+- **Skin‑tone aware** — pick your shade on the 10‑point **Monk Skin Tone** scale; the engine
+  leans into the colours that flatter you most near the face, and never rules any out.
+- **Colours to buy** — the gap engine tells you the one colour that unlocks the most new looks
+  (mode‑aware — no blue "formal trousers").
+- **Named shades & honest copy** — every card explains *why* a pairing works, with a real
+  mood/region note instead of a repetitive line.
+- **Colour science** — recommendations are grounded in a curated, cross‑referenced dataset
+  (Pantone, the Monk Skin Tone research, Who What Wear, Gentleman's Gazette, The Concept Wardrobe).
+- **Backup & restore** — plain‑text and **Google Drive** backup of your whole multi‑wardrobe setup.
+- **Daily reminder**, dark/light themes, and fluid (reduce‑motion‑aware) animations throughout.
 
-Requires **Node 18+**. From this folder:
+## 📦 Download
 
-```bash
-npm install        # if node_modules is missing
-npm test           # run the engine test suite (45 tests)
-npx expo start     # start Metro; open in Expo Go (iOS/Android) or a simulator
-```
+Grab the latest signed APK from the [**Releases**](https://github.com/aucksy/ColorCloset/releases/latest)
+page (also visible under *Releases* in the GitHub mobile app). Sideload it on any Android phone.
 
-The app runs in **Expo Go** for this pass (no native build needed). Press `i` / `a`
-in the Expo CLI for a simulator, or scan the QR code with Expo Go on a device.
+> Builds are **arm64‑v8a**, R8‑minified (~33 MB). All GitHub builds share one signing key, so
+> they update over each other cleanly.
 
-> A headless full-app bundle is validated with `npx expo export --platform ios`.
+## 🧠 The engine
 
-## Layout
+The recommendation engine in [`src/engine/`](src/engine/) is **pure, deterministic and
+dependency‑free** (no React‑Native imports) and fully unit‑tested. It combines:
+
+- a **curated spine** — 45 hand‑checked combinations across the four gender×mode buckets, used
+  as high‑confidence recommendations with named shades and "why it works" copy; and
+- a **generative scorer** built on the research doc's shade‑pairing principles (light↔deep
+  contrast, tonal/monochrome, neutrals as free agents, warm/cool harmony, skin‑tier→top), which
+  generalises to any colours you own — with the "combinations to avoid" list suppressed.
+
+The source of truth is [`Product Docs/Color Combination Research.md`](Product%20Docs/).
+
+## 🛠 Tech stack
+
+React Native **0.85** · Expo **SDK 56** (expo‑router) · TypeScript (strict) · Zustand + persist
+(AsyncStorage) · Reanimated 4 · react‑native‑svg · Jest. Native release builds via Gradle on
+GitHub Actions.
+
+## 📁 Project structure
 
 ```
 src/
-  engine/      pure colour-intelligence engine (the IP) — colors, skin, scoring, deck, gap, naming
-  store/       Zustand store (+ persist) and the KV storage adapter
-  theme/       design tokens (PRD §12.1), fonts, reduce-motion hook
-  components/  Button, ChipRow, SwatchGrid, SkinGrid, OutfitCard, GarmentSilhouette, panels, …
-  app/         expo-router routes: index (gate) -> onboarding -> main
-__tests__/     engine unit tests + prototype-parity golden snapshots
+  app/         expo-router screens (welcome, onboarding, main) + layout
+  engine/      pure colour engine: colours, shades, skin, curated dataset, scoring, deck, gap
+  store/       Zustand store (gender×mode wardrobes, persist v6) + storage adapter
+  components/  UI + panels (swipe deck, outfit card, shade picker, side menu, …)
+  lib/         drive backup, notifications, haptics, dates
+  theme/       design tokens, fonts, motion
+__tests__/     engine + store + golden snapshots (94 tests)
+android/       prebuilt native project (built in CI)
 ```
 
-Source of truth for behaviour, weights, and visual design: `../Product Docs/colorcloset-v3 Prototype.html`.
+## 🚀 Build & release (CI)
+
+Releases are **tag‑driven** — there is no local Android build. Pushing a `vX.Y.Z` tag runs
+[`.github/workflows/release-apk.yml`](.github/workflows/release-apk.yml), which builds a signed
+release APK on GitHub's runners and publishes it as a GitHub Release.
+
+```bash
+# cut a release
+git tag v1.0.1 && git push origin v1.0.1
+```
+
+Required repository **secrets** (Settings → Secrets and variables → Actions):
+
+| Secret | What it is |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | base64 of the release keystore |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore (store) password |
+| `ANDROID_KEY_ALIAS` | signing key alias |
+| `ANDROID_KEY_PASSWORD` | signing key password |
+
+> ⚠️ Keep the keystore safe — losing it means you can't ship updates to the installed app.
+
+## 💻 Local development
+
+```bash
+npm ci
+npx expo start      # run in Expo Go / a dev client
+npx tsc --noEmit    # typecheck
+npx jest            # unit tests
+```
+
+Regenerate the native `android/` project after changing `app.json`/plugins:
+`npx expo prebuild --platform android --no-install` (then re‑apply the release signing block in
+`android/app/build.gradle`).
+
+## 📄 License
+
+Proprietary — © 2026 aucksy. All rights reserved. See [LICENSE](LICENSE).
