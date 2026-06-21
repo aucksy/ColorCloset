@@ -60,22 +60,44 @@ function ensureReady() {
   configureDrive();
 }
 
-/** Interactive sign-in. Returns the account email, or null if the user cancelled. */
+/**
+ * Interactive sign-in. Returns the account email, or null ONLY when the user genuinely
+ * cancels. Every other failure THROWS a DriveError with an actionable message (so the UI
+ * never silently no-ops). The most common failure on a fresh signing key is a
+ * DEVELOPER_ERROR / empty result, which means this build's package + SHA-1 isn't registered
+ * as an Android OAuth client in the Google Cloud project.
+ */
 export async function signInToDrive(): Promise<string | null> {
   ensureReady();
+  let res: unknown;
   try {
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-    const res = await GoogleSignin.signIn();
-    if ((res as any)?.type === 'cancelled') return null;
-    return emailOf(res);
+    res = await GoogleSignin.signIn();
   } catch (e) {
     if (isErrorWithCode(e)) {
-      if (e.code === statusCodes.SIGN_IN_CANCELLED) return null;
+      if (e.code === statusCodes.SIGN_IN_CANCELLED) return null; // genuine user cancel
       if (e.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE)
         throw new DriveError('Google Play services isn’t available on this device.');
     }
-    throw new DriveError('Couldn’t sign in to Google.');
+    // DEVELOPER_ERROR (10) isn't in this version's typed statusCodes — match it loosely.
+    const code = (e as any)?.code;
+    if (code === 'DEVELOPER_ERROR' || code === 10 || code === '10') {
+      throw new DriveError(
+        'Google sign-in isn’t authorised for this build. Its signing key (SHA-1) for com.colorcloset.app must be added as an Android OAuth client in Google Cloud.'
+      );
+    }
+    throw new DriveError(`Couldn’t sign in to Google${(e as any)?.message ? `: ${(e as any).message}` : '.'}`);
   }
+  if ((res as any)?.type === 'cancelled') return null;
+  const email = emailOf(res);
+  if (!email) {
+    // Account was chosen but Google returned no usable account — almost always a missing
+    // Android OAuth client (package + SHA-1) in the Cloud project.
+    throw new DriveError(
+      'Signed in, but Google returned no account — the app’s Android OAuth client (com.colorcloset.app + SHA-1) is likely missing in Google Cloud.'
+    );
+  }
+  return email;
 }
 
 /** Silent sign-in (no UI). Returns the email if a session exists, else null. */

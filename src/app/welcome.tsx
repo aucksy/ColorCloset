@@ -335,14 +335,19 @@ function SkinVisual({ t }: { t: ThemeT }) {
 function ScienceVisual({ t }: { t: ThemeT }) {
   return (
     <View style={[styles.sources, { borderColor: t.line }]}>
-      {SOURCES.slice(0, 5).map((s) => (
-        <View key={s.name} style={styles.sourceRow}>
-          <View style={[styles.sourceDot, { backgroundColor: t.accent }]} />
-          <Text numberOfLines={1} style={[styles.sourceName, { color: t.ink, fontFamily: fonts.displaySemi }]}>
-            {s.name}
-          </Text>
-        </View>
-      ))}
+      {SOURCES.slice(0, 5).map((s) => {
+        // Drop the parenthetical attribution for the teaser (the full credit lives in the
+        // "Colour science" panel) so long names like the Monk Skin Tone scale fit on one line.
+        const label = s.name.replace(/\s*\([^)]*\)/g, '').trim();
+        return (
+          <View key={s.name} style={styles.sourceRow}>
+            <View style={[styles.sourceDot, { backgroundColor: t.accent }]} />
+            <Text numberOfLines={1} style={[styles.sourceName, { color: t.ink, fontFamily: fonts.displaySemi }]}>
+              {label}
+            </Text>
+          </View>
+        );
+      })}
     </View>
   );
 }
