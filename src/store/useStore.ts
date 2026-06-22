@@ -75,7 +75,7 @@ interface PersistedState {
   mst: number | null; // skin swatch 1..10 (engine derives the tier)
   wardrobes: Record<BucketKey, Wardrobe>; // all 4 keys always present
   pendingWardrobe: Wardrobe | null; // migration holding pen until gender is chosen
-  theme: 'dark' | 'light';
+  theme: 'system' | 'dark' | 'light';
   style: StyleName;
   swipeHintSeen: boolean;
   coachSeen: boolean; // the double-tap-to-save coachmark
@@ -121,7 +121,7 @@ interface Actions {
   deleteSaved: (id: number) => void;
   clearWorn: () => void;
   // settings / data
-  setTheme: (t: 'dark' | 'light') => void;
+  setTheme: (t: 'system' | 'dark' | 'light') => void;
   toggleTheme: () => void;
   completeSetup: () => void;
   resetWardrobe: () => void;
@@ -166,12 +166,13 @@ const PERSISTED_DEFAULTS: PersistedState = {
   mst: null,
   wardrobes: emptyWardrobes(),
   pendingWardrobe: null,
-  theme: 'dark',
+  theme: 'system', // follow the device appearance until the user picks Dark/Light
   style: 'Minimal',
   swipeHintSeen: false,
   coachSeen: false,
   welcomeSeen: false,
-  notify: { enabled: false, hour: 9, minute: 0, days: [1, 2, 3, 4, 5, 6, 7] },
+  notify: { enabled: true, hour: 9, minute: 0, days: [1, 2, 3, 4, 5, 6, 7] }, // daily reminder on by default
+
   setupComplete: false,
   drive: { email: null, lastBackup: null, auto: false },
 };
@@ -521,7 +522,7 @@ export const useStore = create<Store>()(
               wardrobes,
               pendingWardrobe: null,
               style: isStyle(p.style) ? p.style : 'Minimal',
-              theme: p.theme === 'light' ? 'light' : 'dark',
+              theme: p.theme === 'light' || p.theme === 'system' ? p.theme : 'dark',
               notify: p.notify ?? PERSISTED_DEFAULTS.notify,
               setupComplete: !!p.setupComplete,
               ...SESSION_DEFAULTS,
@@ -546,7 +547,7 @@ export const useStore = create<Store>()(
               mode: 'formal',
               mst: p.depth ? mstFromLegacyLabel(p.depth) : s.mst,
               style: isStyle(p.style) ? p.style : s.style,
-              theme: p.theme === 'light' ? 'light' : 'dark',
+              theme: p.theme === 'light' || p.theme === 'system' ? p.theme : 'dark',
               notify: p.notify ?? s.notify,
               setupComplete: s.gender ? true : s.setupComplete,
               ...SESSION_DEFAULTS,

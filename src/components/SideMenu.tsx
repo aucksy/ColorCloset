@@ -18,8 +18,7 @@ export function SideMenu() {
   const closeDrawer = useUiStore((s) => s.closeDrawer);
   const openPanel = useUiStore((s) => s.openPanel);
 
-  const theme = useStore((s) => s.theme);
-  const toggleTheme = useStore((s) => s.toggleTheme);
+  const setTheme = useStore((s) => s.setTheme);
   const gender = useStore((s) => s.gender);
   const mode = useStore((s) => s.mode);
   const mst = useStore((s) => s.mst);
@@ -86,7 +85,7 @@ export function SideMenu() {
           <Item t={t} icon="heart" label="Saved looks" onPress={() => openPanel('saved')} right={String(w.saved.length)} />
           <Item t={t} icon="bell" label="Daily reminder" onPress={() => openPanel('reminder')} />
 
-          <Toggle t={t} icon={theme === 'dark' ? 'moon' : 'sun'} label={theme === 'dark' ? 'Dark mode' : 'Light mode'} on={theme === 'light'} onPress={toggleTheme} />
+          <Toggle t={t} icon={t.name === 'dark' ? 'moon' : 'sun'} label={t.name === 'dark' ? 'Dark mode' : 'Light mode'} on={t.name === 'light'} onPress={() => setTheme(t.name === 'dark' ? 'light' : 'dark')} />
 
           <View style={[styles.div, { backgroundColor: t.line }]} />
 
@@ -94,7 +93,7 @@ export function SideMenu() {
           <Item t={t} icon="setup" label="Set up again" onPress={setupAgain} />
           <Item t={t} icon="download" label="Backup & restore" onPress={() => openPanel('backup')} />
           <Item t={t} icon="info" label="How it works" onPress={() => openPanel('about')} />
-          <Item t={t} icon="star" label="Colour science" onPress={() => openPanel('sources')} highlight badge="NEW" />
+          <Item t={t} icon="star" label="Colour science" onPress={() => openPanel('sources')} highlight />
           <Item t={t} icon="reset" label="Reset wardrobe" onPress={reset} />
 
           <Text style={[styles.foot, { color: t.faint, fontFamily: fonts.uiRegular }]}>

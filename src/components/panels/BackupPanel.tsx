@@ -66,6 +66,7 @@ export function BackupPanel() {
         return; // cancelled
       }
       setDriveEmail(email);
+      setDriveAuto(true); // connecting opts you into auto-backup by default (toggle off below)
       // First connect = immediate backup so there's something to restore.
       const iso = await backupToDrive(exportData());
       setDriveLastBackup(iso);

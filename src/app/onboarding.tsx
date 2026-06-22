@@ -22,6 +22,7 @@ import { SwatchGrid } from '@/components/SwatchGrid';
 import { useActiveWardrobe, useStore } from '@/store/useStore';
 import { useUiStore } from '@/store/uiStore';
 import { isDriveConfigured, restoreFromDrive, signInToDrive } from '@/lib/drive';
+import { syncReminders } from '@/lib/notify';
 import { fonts } from '@/theme/fonts';
 import { useTheme } from '@/theme/useTheme';
 
@@ -97,7 +98,14 @@ export default function Onboarding() {
 
   const finish = () => setBuilding(true);
   const onBuilt = () => {
-    if (!addMode) completeSetup();
+    if (!addMode) {
+      completeSetup();
+      // Ask for notification permission and arm the (on-by-default) daily reminder.
+      // Fire-and-forget so the system dialog pops over the main screen, not the overlay.
+      syncReminders(useStore.getState().notify).then((ok) => {
+        if (!ok) useStore.getState().setNotify({ enabled: false });
+      });
+    }
     regenerate();
     if (addMode) router.back();
     else router.replace('/main');
@@ -344,6 +352,8 @@ function RestoreSheet({
   onRestored: () => void;
 }) {
   const importData = useStore((s) => s.importData);
+  const setDriveEmail = useStore((s) => s.setDriveEmail);
+  const setDriveAuto = useStore((s) => s.setDriveAuto);
   const showToast = useUiStore((s) => s.showToast);
   const [paste, setPaste] = useState('');
   const [busy, setBusy] = useState<RestoreBusy>(null);
@@ -358,6 +368,9 @@ function RestoreSheet({
         setBusy(null);
         return; // cancelled
       }
+      // Logged in during onboarding → remember the account and turn auto-backup on by default.
+      setDriveEmail(email);
+      setDriveAuto(true);
       const json = await restoreFromDrive();
       if (!json) {
         showToast('No backup found in Drive yet');
