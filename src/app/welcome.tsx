@@ -372,7 +372,10 @@ const styles = StyleSheet.create({
 
   /* hero */
   hero: { alignItems: 'center', gap: 30 },
-  heroLogoWrap: { alignItems: 'center', justifyContent: 'center' },
+  // Fixed to the glow's size so the absolutely-positioned glow fills the wrap and stays
+  // centred behind the (smaller) logo — without it the wrap shrank to the logo and the
+  // glow pinned to the top-left, sitting off-centre.
+  heroLogoWrap: { width: 150, height: 150, alignItems: 'center', justifyContent: 'center' },
   heroGlow: { position: 'absolute', width: 150, height: 150, borderRadius: 80, opacity: 0.5 },
   heroSwatches: { flexDirection: 'row', gap: 8, marginTop: 6 },
   heroSwatch: { width: 30, height: 42, borderRadius: 8, borderWidth: 1 },

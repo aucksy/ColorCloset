@@ -8,6 +8,7 @@ import { Button } from '@/components/Button';
 import { ChipRow } from '@/components/ChipRow';
 import { Icon } from '@/components/Icon';
 import { Logo } from '@/components/Logo';
+import { NotifyPrimer } from '@/components/NotifyPrimer';
 import { Segmented } from '@/components/Segmented';
 import { SideMenu } from '@/components/SideMenu';
 import { SwipeDeck } from '@/components/SwipeDeck';
@@ -374,6 +375,9 @@ export default function Main() {
       {panel === 'backup' && <BackupPanel />}
       {panel === 'sources' && <SourcesPanel />}
       {panel === 'buy' && <BuyPanel />}
+
+      {/* explained, one-time notification-permission ask (fresh setup OR restore) */}
+      <NotifyPrimer />
 
       {/* themed "worn them all" dialog (replaces the OS Alert) — global, all styles worn */}
       {showWornAll && (

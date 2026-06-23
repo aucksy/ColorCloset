@@ -53,6 +53,9 @@ describe('legacy import + gender hand-off (migration path)', () => {
       saved: [],
     });
     expect(get().importData(legacy)).toBe(true);
+    // a restore marks setup complete even before a gender is chosen, so the app routes
+    // through the one-step gender micro-onboarding (not back to a blank first-run)
+    expect(get().setupComplete).toBe(true);
     // gender unknown → held in the pending pen, Maroon mapped to Burgundy
     expect(get().pendingWardrobe).not.toBeNull();
     expect(get().pendingWardrobe!.tops).toContain('Burgundy');

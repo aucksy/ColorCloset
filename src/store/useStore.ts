@@ -81,6 +81,7 @@ interface PersistedState {
   coachSeen: boolean; // the double-tap-to-save coachmark
   welcomeSeen: boolean; // the first-launch feature-intro carousel
   notify: NotifySettings;
+  notifyAsked: boolean; // shown the explained notification-permission primer once
   setupComplete: boolean;
   drive: DriveState;
 }
@@ -115,6 +116,7 @@ interface Actions {
   markSwipeHintSeen: () => void;
   markCoachSeen: () => void;
   markWelcomeSeen: () => void;
+  markNotifyAsked: () => void;
   setNotify: (patch: Partial<NotifySettings>) => void;
   // saved / worn
   saveCurrent: () => void;
@@ -172,6 +174,7 @@ const PERSISTED_DEFAULTS: PersistedState = {
   coachSeen: false,
   welcomeSeen: false,
   notify: { enabled: true, hour: 9, minute: 0, days: [1, 2, 3, 4, 5, 6, 7] }, // daily reminder on by default
+  notifyAsked: false, // the explained permission primer hasn't run yet
 
   setupComplete: false,
   drive: { email: null, lastBackup: null, auto: false },
@@ -441,6 +444,7 @@ export const useStore = create<Store>()(
       markSwipeHintSeen: () => set({ swipeHintSeen: true }),
       markCoachSeen: () => set({ coachSeen: true }),
       markWelcomeSeen: () => set({ welcomeSeen: true }),
+      markNotifyAsked: () => set({ notifyAsked: true }),
       setNotify: (patch) => set({ notify: { ...get().notify, ...patch } }),
 
       saveCurrent: () => {
@@ -549,7 +553,10 @@ export const useStore = create<Store>()(
               style: isStyle(p.style) ? p.style : s.style,
               theme: p.theme === 'light' || p.theme === 'system' ? p.theme : 'dark',
               notify: p.notify ?? s.notify,
-              setupComplete: s.gender ? true : s.setupComplete,
+              // A restore is an explicit returning-user signal. If no gender is chosen yet
+              // the data sits in pendingWardrobe; the one-step gender micro-onboarding
+              // (setupComplete && gender == null) folds it into a bucket before main.
+              setupComplete: true,
               ...SESSION_DEFAULTS,
               _hasHydrated: true,
             });
@@ -606,6 +613,7 @@ export const useStore = create<Store>()(
             coachSeen: false,
             welcomeSeen: true, // existing v5 users have already set up — skip the intro
             notify: persisted.notify ?? PERSISTED_DEFAULTS.notify,
+            notifyAsked: true, // don't surprise an existing user with a fresh permission ask
             setupComplete: !!persisted.setupComplete,
             drive: persisted.drive ?? PERSISTED_DEFAULTS.drive,
           } as PersistedState;
@@ -624,6 +632,7 @@ export const useStore = create<Store>()(
         coachSeen: s.coachSeen,
         welcomeSeen: s.welcomeSeen,
         notify: s.notify,
+        notifyAsked: s.notifyAsked,
         setupComplete: s.setupComplete,
         drive: s.drive,
       }),

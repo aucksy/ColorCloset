@@ -22,7 +22,6 @@ import { SwatchGrid } from '@/components/SwatchGrid';
 import { useActiveWardrobe, useStore } from '@/store/useStore';
 import { useUiStore } from '@/store/uiStore';
 import { isDriveConfigured, restoreFromDrive, signInToDrive } from '@/lib/drive';
-import { syncReminders } from '@/lib/notify';
 import { fonts } from '@/theme/fonts';
 import { useTheme } from '@/theme/useTheme';
 
@@ -98,14 +97,9 @@ export default function Onboarding() {
 
   const finish = () => setBuilding(true);
   const onBuilt = () => {
-    if (!addMode) {
-      completeSetup();
-      // Ask for notification permission and arm the (on-by-default) daily reminder.
-      // Fire-and-forget so the system dialog pops over the main screen, not the overlay.
-      syncReminders(useStore.getState().notify).then((ok) => {
-        if (!ok) useStore.getState().setNotify({ enabled: false });
-      });
-    }
+    // The notification-permission ask is handled with an explanation on the main screen
+    // (NotifyPrimer) — it covers both this fresh-setup path and the restore-a-backup path.
+    if (!addMode) completeSetup();
     regenerate();
     if (addMode) router.back();
     else router.replace('/main');
@@ -278,7 +272,15 @@ export default function Onboarding() {
         onClose={() => setRestoreOpen(false)}
         onRestored={() => {
           setRestoreOpen(false);
-          router.replace('/main');
+          // A v6 backup carries its gender → straight to main. A legacy backup restored
+          // before a gender was chosen lands in pendingWardrobe with no active bucket;
+          // send it through the one-step gender micro-onboarding so setGender folds the
+          // data into a bucket (and the main-screen reminder primer can then fire).
+          if (useStore.getState().gender == null) {
+            router.replace({ pathname: '/onboarding', params: { genderOnly: '1' } });
+          } else {
+            router.replace('/main');
+          }
         }}
       />
     </View>

@@ -41,14 +41,20 @@ async function ensureChannel() {
 
 async function doSync(notify: NotifySettings): Promise<boolean> {
   try {
-    if (!notify.enabled || notify.days.length === 0) {
+    // Reminders off entirely → just clear the schedule (no permission needed).
+    if (!notify.enabled) {
       await Notifications.cancelAllScheduledNotificationsAsync();
       return true;
     }
+    // Reminders on → confirm permission FIRST, even when no days are picked yet. This
+    // keeps the grant result honest for callers like the onboarding primer, so the
+    // toggle is never left on without an actual OS prompt (e.g. a restored backup that
+    // had enabled:true but an empty day list).
     const ok = await ensurePermission();
     if (!ok) return false; // don't wipe a working schedule on denial
 
     await Notifications.cancelAllScheduledNotificationsAsync();
+    if (notify.days.length === 0) return true; // granted, nothing to schedule yet
     await ensureChannel();
     for (const weekday of notify.days) {
       await Notifications.scheduleNotificationAsync({
