@@ -113,6 +113,7 @@ interface Actions {
   setLastPickDay: (d: string) => void;
   // controls
   setStyle: (s: StyleName) => void;
+  goStyleEdge: (s: StyleName, edge: 'start' | 'end') => void;
   markSwipeHintSeen: () => void;
   markCoachSeen: () => void;
   markWelcomeSeen: () => void;
@@ -440,6 +441,22 @@ export const useStore = create<Store>()(
       setStyle: (st) => {
         set({ style: st });
         get().regenerate();
+      },
+
+      // Jump to a style and land on its FIRST ('start') or LAST ('end') card. Unlike
+      // setStyle (which seeds the best unworn look), this is positional — the swipe deck
+      // uses it so forward/back flow continuously across style groups and loops cleanly.
+      goStyleEdge: (st, edge) => {
+        set({ style: st, deckPos: -1 });
+        const s = get();
+        const deck = deckFor(s);
+        if (!deck.length) {
+          set({ current: null, currentName: '', deckPos: -1 });
+          return;
+        }
+        const pos = edge === 'end' ? deck.length - 1 : 0;
+        const pick = deck[pos];
+        set({ current: { t: pick.t, b: pick.b }, currentName: nameFor(s, pick.t, pick.b), deckPos: pos });
       },
       markSwipeHintSeen: () => set({ swipeHintSeen: true }),
       markCoachSeen: () => set({ coachSeen: true }),

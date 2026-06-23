@@ -4,7 +4,7 @@ import Animated, { FadeIn, FadeOut, SlideInLeft, SlideOutLeft } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GENDER_LABEL, MODE_LABEL, skinObj, uniStats } from '@/engine';
 import { Icon, type IconName } from '@/components/Icon';
-import { Logo } from '@/components/Logo';
+import { LogoBadge } from '@/components/LogoBadge';
 import { useActiveWardrobe, useStore } from '@/store/useStore';
 import { useUiStore } from '@/store/uiStore';
 import { fonts } from '@/theme/fonts';
@@ -65,10 +65,17 @@ export function SideMenu() {
       <Animated.View
         entering={SlideInLeft.springify().damping(17).stiffness(150).mass(0.7)}
         exiting={SlideOutLeft.duration(240)}
-        style={[styles.sheet, { backgroundColor: t.surface, borderRightColor: t.line, paddingTop: insets.top + 22, paddingBottom: insets.bottom + 4 }]}
+        style={[styles.sheet, { paddingTop: insets.top + 22, paddingBottom: insets.bottom + 4 }]}
       >
+        {/* Themed background on a plain (non-layout-animated) child: a Reanimated
+            layout-animated view caches its own style and would lag a theme switch by a
+            frame, so the panel must paint its surface here instead. */}
+        <View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: t.surface, borderRightWidth: 1, borderRightColor: t.line }]}
+        />
         <View style={styles.brand}>
-          <Logo size={30} />
+          <LogoBadge size={34} />
           <Text style={[styles.brandTxt, { color: t.ink, fontFamily: fonts.uiBold }]}>ColorCloset</Text>
         </View>
 
@@ -181,7 +188,7 @@ const styles = StyleSheet.create({
     width: '80%',
     maxWidth: 320,
     zIndex: 60,
-    borderRightWidth: 1,
+    overflow: 'hidden',
     paddingHorizontal: 18,
   },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, paddingBottom: 8 },

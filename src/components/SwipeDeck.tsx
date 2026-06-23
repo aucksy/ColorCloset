@@ -19,8 +19,8 @@ import { useStore } from '@/store/useStore';
 import { useTheme } from '@/theme/useTheme';
 
 interface Props {
-  pos: number; // 0-based deck position
-  total: number;
+  navTick: number; // bumps on every browse step so the new card reliably slides in
+  canSwipe: boolean; // true when there's more than one look to move between (globally)
   onNext: () => void; // swipe left
   onPrev: () => void; // swipe right
   onSave: () => boolean; // double-tap; returns true if it actually saved (else already saved)
@@ -29,10 +29,10 @@ interface Props {
 /**
  * Tinder-style browse. The card sits on a visible stack so it reads as swipeable; on
  * first use it nudges itself left/right once. A light flick (low distance OR velocity)
- * commits; the card flies off, the store advances, and — keyed on the new pos — the
- * next card slides in. Haptics fire on each swipe; double-tap saves with a heart burst.
+ * commits; the card flies off, the store advances, and — keyed on `navTick` — the next
+ * card snaps in. Haptics fire on each swipe; double-tap saves with a heart burst.
  */
-export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
+export function SwipeDeck({ navTick, canSwipe, onNext, onPrev, onSave }: Props) {
   const t = useTheme();
   const { width } = useWindowDimensions();
   const tx = useSharedValue(0);
@@ -61,16 +61,18 @@ export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hintSeen]);
 
-  // After the new look commits (pos changed), slide the next card in from the edge.
+  // After the new look commits (navTick bumps), snap the next card in from the parked
+  // edge. Driven by navTick — not the deck position — so it always fires, even when the
+  // new card happens to land on the same index (e.g. when looping or crossing styles).
   const mounted = useRef(false);
   useEffect(() => {
     if (!mounted.current) {
       mounted.current = true;
       return;
     }
-    tx.value = withTiming(0, { duration: 230 });
+    tx.value = withSpring(0, { damping: 20, stiffness: 220, mass: 0.5, overshootClamping: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pos]);
+  }, [navTick]);
 
   const pan = Gesture.Pan()
     .activeOffsetX([-8, 8])
@@ -78,7 +80,7 @@ export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
       tx.value = e.translationX;
     })
     .onEnd((e) => {
-      if (total <= 1) {
+      if (!canSwipe) {
         tx.value = withSpring(0, { damping: 18, stiffness: 180 });
         return;
       }
@@ -92,7 +94,7 @@ export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
         runOnJS(hapticLight)();
         // Old card flies LEFT, then we park the incoming card off-screen RIGHT so it
         // slides in from the opposite side (natural carousel direction).
-        tx.value = withTiming(-OFF, { duration: 180 }, (fin) => {
+        tx.value = withTiming(-OFF, { duration: 140 }, (fin) => {
           if (fin) {
             tx.value = OFF;
             runOnJS(onNext)();
@@ -100,7 +102,7 @@ export function SwipeDeck({ pos, total, onNext, onPrev, onSave }: Props) {
         });
       } else if (goPrev) {
         runOnJS(hapticLight)();
-        tx.value = withTiming(OFF, { duration: 180 }, (fin) => {
+        tx.value = withTiming(OFF, { duration: 140 }, (fin) => {
           if (fin) {
             tx.value = -OFF;
             runOnJS(onPrev)();

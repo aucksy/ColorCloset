@@ -65,11 +65,10 @@ const mark = `
 `;
 
 // Background ambiance that lives behind the mark (door keyline, centre seam, glow).
-const ambiance = `
-  <rect x="36" y="30" width="168" height="180" rx="24" fill="none" stroke="${GOLD}" stroke-opacity="0.13" stroke-width="1.5"/>
-  <rect x="119.5" y="44" width="1" height="152" fill="url(#seam)"/>
-  <circle cx="120" cy="125" r="77" fill="url(#glow)"/>
-`;
+const keyline = `<rect x="36" y="30" width="168" height="180" rx="24" fill="none" stroke="${GOLD}" stroke-opacity="0.13" stroke-width="1.5"/>`;
+const seam = `<rect x="119.5" y="44" width="1" height="152" fill="url(#seam)"/>`;
+const glow = `<circle cx="120" cy="125" r="77" fill="url(#glow)"/>`;
+const ambiance = `${keyline}${seam}${glow}`;
 
 const tile = `<rect width="${VB}" height="${VB}" fill="url(#bg)"/>`;
 const sheen = `<rect width="${VB}" height="${VB}" fill="url(#sheen)"/>`;
@@ -137,6 +136,30 @@ if (fs.existsSync(RES)) {
     for (const f of ['ic_launcher_foreground', 'ic_launcher_background', 'ic_launcher_monochrome', 'ic_launcher', 'ic_launcher_round'])
       rmIf(path.join(dir, `${f}.webp`));
     console.log('android mipmap-' + dpi, '→ png (webp removed)');
+  }
+
+  // Android 12+ splash icon (windowSplashScreenAnimatedIcon = drawable/splashscreen_logo).
+  // Same no-prebuild gotcha. We mask the icon to a circle filling ~82% of the splash
+  // canvas (the icon-with-background safe size) — much larger than expo's tiny default —
+  // on the obsidian splash background, so the new mark reads big and centred on launch.
+  const SPLASH = { mdpi: 288, hdpi: 432, xhdpi: 576, xxhdpi: 864, xxxhdpi: 1152 };
+  const splashLogo = (canvas) => {
+    const D = Math.round(canvas * 0.82);
+    const off = (canvas - D) / 2;
+    const k = D / VB;
+    // clipPath must live in <defs>; clip and transform must be on SEPARATE nested groups
+    // (resvg renders incorrectly when both are on one <g>).
+    return (
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas}" height="${canvas}" viewBox="0 0 ${canvas} ${canvas}">${defs}` +
+      `<defs><clipPath id="sclip"><circle cx="${canvas / 2}" cy="${canvas / 2}" r="${D / 2}"/></clipPath></defs>` +
+      `<g clip-path="url(#sclip)"><g transform="translate(${n(off)} ${n(off)}) scale(${n(k)})">${tile}${glow}${mark}</g></g></svg>`
+    );
+  };
+  for (const [dpi, c] of Object.entries(SPLASH)) {
+    const dir = path.join(RES, `drawable-${dpi}`);
+    if (!fs.existsSync(dir)) continue;
+    renderTo(dir, 'splashscreen_logo.png', splashLogo(c), c);
+    console.log('android drawable-' + dpi, 'splashscreen_logo.png');
   }
 } else {
   console.log('android/ not present — skipped native res');

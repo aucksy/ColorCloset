@@ -7,7 +7,7 @@ import { STYLES, buildDeck, comboUniverse, skinObj, type Mode, type StyleName } 
 import { Button } from '@/components/Button';
 import { ChipRow } from '@/components/ChipRow';
 import { Icon } from '@/components/Icon';
-import { Logo } from '@/components/Logo';
+import { LogoBadge } from '@/components/LogoBadge';
 import { NotifyPrimer } from '@/components/NotifyPrimer';
 import { Segmented } from '@/components/Segmented';
 import { SideMenu } from '@/components/SideMenu';
@@ -57,6 +57,7 @@ export default function Main() {
   const regenerate = useStore((s) => s.regenerate);
   const next = useStore((s) => s.next);
   const prev = useStore((s) => s.prev);
+  const goStyleEdge = useStore((s) => s.goStyleEdge);
   const goToIndex = useStore((s) => s.goToIndex);
   const markWorn = useStore((s) => s.markWorn);
   const dismiss = useStore((s) => s.dismiss);
@@ -113,6 +114,16 @@ export default function Main() {
     const i = STYLES.indexOf(from);
     return STYLES.slice(i + 1).concat(STYLES.slice(0, i)).find(pred);
   };
+  // Cyclic PREVIOUS style — scans backwards, wrapping past the start, for swipe-back.
+  const prevStyleWith = (from: StyleName, pred: (s: StyleName) => boolean): StyleName | undefined => {
+    const i = STYLES.indexOf(from);
+    return [...STYLES.slice(0, i).reverse(), ...STYLES.slice(i + 1).reverse()].find(pred);
+  };
+
+  // Bumped on every browse step so the SwipeDeck slides the new card in reliably — even
+  // when the new card lands on the same numeric deck position (which a bare `pos` dep misses).
+  const [navTick, setNavTick] = useState(0);
+  const bumpNav = () => setNavTick((n) => n + 1);
 
   // First entry: seed a decisive "Today's pick" once a day (a strong, day-stable look).
   useLayoutEffect(() => {
@@ -194,19 +205,43 @@ export default function Main() {
   const onNext = () => {
     setOnToday(false);
     setSwipes((n) => n + 1);
+    bumpNav();
+    // Read style/pos LIVE (not from the render closure): a swipe commits ~140ms after the
+    // gesture, so a fast second flick can run before this component re-renders from the
+    // first — a stale closure would re-fire the cross-style jump and re-land on card 0.
+    // styleLen is memoised off wardrobe data (unaffected by a swipe), so it's safe by key.
+    const { style: curStyle, deckPos: curPos } = useStore.getState();
+    const curTotal = styleLen[curStyle];
     // On the last card of this style, hop to the next non-empty style (cyclic via STYLES
-    // order) so swiping flows across styles and loops back instead of dead-ending.
-    if (total > 0 && deckPos >= total - 1) {
-      const nextStyle = nextStyleWith(style, (s) => styleLen[s] > 0);
-      if (nextStyle && nextStyle !== style) {
-        setStyle(nextStyle);
-        showToast(`That's all your ${style} looks — showing ${nextStyle}`);
+    // order) and land on its FIRST card so swiping flows across styles and loops back to
+    // the very first look instead of dead-ending.
+    if (curTotal > 0 && curPos >= curTotal - 1) {
+      const nextStyle = nextStyleWith(curStyle, (s) => styleLen[s] > 0);
+      if (nextStyle && nextStyle !== curStyle) {
+        goStyleEdge(nextStyle, 'start');
+        showToast(`That's all your ${curStyle} looks — showing ${nextStyle}`);
         return;
       }
     }
     next();
   };
-  const onPrev = () => { setOnToday(false); setSwipes((n) => n + 1); prev(); };
+  const onPrev = () => {
+    setOnToday(false);
+    setSwipes((n) => n + 1);
+    bumpNav();
+    const { style: curStyle, deckPos: curPos } = useStore.getState();
+    // On the FIRST card of this style, hop BACK to the previous non-empty style (cyclic)
+    // and land on its LAST card, so swiping back also flows across style groups and loops.
+    if (curPos <= 0) {
+      const prevStyle = prevStyleWith(curStyle, (s) => styleLen[s] > 0);
+      if (prevStyle && prevStyle !== curStyle) {
+        goStyleEdge(prevStyle, 'end');
+        showToast(`Back to your ${prevStyle} looks`);
+        return;
+      }
+    }
+    prev();
+  };
   const onWore = () => {
     setOnToday(false);
     // Was this the last UNWORN look in the current style? (decide before marking)
@@ -246,7 +281,7 @@ export default function Main() {
           <Icon name="menu" size={18} color={t.ink} />
         </Pressable>
         <View style={styles.brand}>
-          <Logo size={26} />
+          <LogoBadge size={34} />
           <Text style={[styles.brandTxt, { color: t.ink, fontFamily: fonts.display }]}>
             Color<Text style={{ color: t.accent }}>Closet</Text>
           </Text>
@@ -285,7 +320,7 @@ export default function Main() {
 
             <View style={{ marginTop: 12 }}>
               {current ? (
-                <SwipeDeck pos={deckPos} total={total} onNext={onNext} onPrev={onPrev} onSave={onSave} />
+                <SwipeDeck navTick={navTick} canSwipe={grandTotal > 1} onNext={onNext} onPrev={onPrev} onSave={onSave} />
               ) : isEmptyStyle ? (
                 <View style={styles.emptyRec}>
                   <View style={[styles.emptyIc, { backgroundColor: t.glass, borderColor: t.line }]}>
@@ -415,8 +450,8 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 16, paddingBottom: 10 },
   hamb: { width: 40, height: 40, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  brandTxt: { fontSize: 19, letterSpacing: -0.3 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brandTxt: { fontSize: 20, letterSpacing: -0.3 },
   status: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 12 },
   counter: { fontSize: 13 },
   hint: { fontSize: 11 },

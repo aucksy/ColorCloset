@@ -372,11 +372,10 @@ const styles = StyleSheet.create({
 
   /* hero */
   hero: { alignItems: 'center', gap: 30 },
-  // Fixed to the glow's size so the absolutely-positioned glow fills the wrap and stays
-  // centred behind the (smaller) logo — without it the wrap shrank to the logo and the
-  // glow pinned to the top-left, sitting off-centre.
+  // Fixed square wrap; the glow fills it via explicit insets (not Yoga's default absolute
+  // placement) so it's unambiguously centred behind the logo regardless of RN version.
   heroLogoWrap: { width: 150, height: 150, alignItems: 'center', justifyContent: 'center' },
-  heroGlow: { position: 'absolute', width: 150, height: 150, borderRadius: 80, opacity: 0.5 },
+  heroGlow: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 80, opacity: 0.5 },
   heroSwatches: { flexDirection: 'row', gap: 8, marginTop: 6 },
   heroSwatch: { width: 30, height: 42, borderRadius: 8, borderWidth: 1 },
 
