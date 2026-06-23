@@ -1,17 +1,27 @@
-import { Circle, Defs, LinearGradient, Path, Rect, Stop, Svg } from 'react-native-svg';
+import { Circle, Defs, G, LinearGradient, Path, Rect, Stop, Svg } from 'react-native-svg';
 
 /**
- * The ColorCloset mark — "Half-Open · Noir": a champagne-bordered wardrobe with one
- * door swung open, garments (beige / forest green / white) on a gold rail. Matches the
- * launcher icon (scripts/make-icons.mjs). Authored in the 240x240 layout.
+ * The ColorCloset mark — the "Noir" CC Mark: a champagne gold wardrobe rail carrying
+ * three signature garments (beige / forest green / ivory) on gold hooks. Drawn on a
+ * transparent canvas so it sits on the app's own surface; kept in sync with the launcher
+ * icon (scripts/make-icons.mjs → "ColorCloset Icon Spec"). Authored in the 240×240 layout
+ * and scaled up about its optical centre to fill the square.
  */
 const GOLD = '#E6C074';
 
-function Garment({ hookCx, x, fill, h }: { hookCx: number; x: number; fill: string; h: number }) {
+// One garment body: a rounded-shoulder arch (round top, near-square foot) with a faint rim.
+function Garment({ x, w, h, fill }: { x: number; w: number; h: number; fill: string }) {
+  const y = 88;
+  const trx = 14;
+  const tryy = 19;
+  const br = 5;
+  const d =
+    `M ${x} ${y + tryy} Q ${x} ${y} ${x + trx} ${y} L ${x + w - trx} ${y} Q ${x + w} ${y} ${x + w} ${y + tryy} ` +
+    `L ${x + w} ${y + h - br} Q ${x + w} ${y + h} ${x + w - br} ${y + h} L ${x + br} ${y + h} Q ${x} ${y + h} ${x} ${y + h - br} Z`;
   return (
     <>
-      <Circle cx={hookCx} cy={59} r={4} stroke={GOLD} strokeWidth={2} fill="none" />
-      <Rect x={x} y={64} width={22} height={h} rx={6} fill={fill} />
+      <Path d={d} fill={fill} />
+      <Path d={d} fill="none" stroke="#ffffff" strokeOpacity={0.16} strokeWidth={0.8} />
     </>
   );
 }
@@ -20,44 +30,37 @@ export function Logo({ size = 24 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 240 240">
       <Defs>
-        <LinearGradient id="lcab" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor="#241f19" /><Stop offset="1" stopColor="#15110d" />
+        <LinearGradient id="lrail" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor="#a9823f" />
+          <Stop offset="0.5" stopColor="#f6e3b0" />
+          <Stop offset="1" stopColor="#a9823f" />
         </LinearGradient>
-        <LinearGradient id="lint" x1="0" y1="0" x2="0.4" y2="1">
-          <Stop offset="0" stopColor="#1d1815" /><Stop offset="1" stopColor="#0d0a08" />
+        <LinearGradient id="lBeige" x1="0" y1="0" x2="0.28" y2="1">
+          <Stop offset="0" stopColor="#ecdebd" /><Stop offset="1" stopColor="#c9b78d" />
         </LinearGradient>
-        <LinearGradient id="lgold" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#f3dca0" /><Stop offset="1" stopColor="#caa052" />
+        <LinearGradient id="lGreen" x1="0" y1="0" x2="0.28" y2="1">
+          <Stop offset="0" stopColor="#427a59" /><Stop offset="1" stopColor="#244432" />
         </LinearGradient>
-        <LinearGradient id="lrdoor" x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor="#2c261e" /><Stop offset="1" stopColor="#191510" />
-        </LinearGradient>
-        <LinearGradient id="lldoor" x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor="#221c15" /><Stop offset="1" stopColor="#3c342a" />
-        </LinearGradient>
-        <LinearGradient id="lbeige" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#e7d9b7" /><Stop offset="1" stopColor="#c9b78d" />
-        </LinearGradient>
-        <LinearGradient id="lgreen" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#3d7053" /><Stop offset="1" stopColor="#264835" />
-        </LinearGradient>
-        <LinearGradient id="lwhite" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#f6f2ea" /><Stop offset="1" stopColor="#dbd4c6" />
+        <LinearGradient id="lWhite" x1="0" y1="0" x2="0.28" y2="1">
+          <Stop offset="0" stopColor="#ffffff" /><Stop offset="1" stopColor="#dbd4c6" />
         </LinearGradient>
       </Defs>
 
-      <Rect x={44} y={31} width={152} height={178} rx={15} fill="url(#lcab)" />
-      <Rect x={45.2} y={32.2} width={149.6} height={175.6} rx={13.8} fill="none" stroke={GOLD} strokeWidth={2.5} strokeOpacity={0.55} />
-      <Rect x={53} y={40} width={134} height={160} rx={8} fill="url(#lint)" />
-      <Rect x={70} y={60.5} width={70} height={2.4} rx={1.2} fill="url(#lgold)" />
-      <Garment hookCx={81} x={70} fill="url(#lbeige)" h={60} />
-      <Garment hookCx={107} x={96} fill="url(#lgreen)" h={66} />
-      <Garment hookCx={133} x={122} fill="url(#lwhite)" h={56} />
-      <Rect x={145} y={40} width={42} height={160} rx={8} fill="url(#lrdoor)" />
-      <Rect x={151} y={112} width={4} height={26} rx={2} fill="url(#lgold)" />
-      <Path d="M52 40 L26 50 L26 190 L52 200 Z" fill="url(#lldoor)" />
-      <Path d="M52 40 L26 50 L26 190 L52 200 Z" fill="none" stroke={GOLD} strokeWidth={1.4} strokeOpacity={0.5} />
-      <Rect x={30} y={108} width={4} height={26} rx={2} fill="url(#lgold)" />
+      <G originX={120} originY={118} scale={1.3}>
+        {/* rail (with a faint shadow line beneath) */}
+        <Rect x={62} y={87} width={116} height={1.4} rx={0.7} fill="#000" opacity={0.4} />
+        <Rect x={62} y={84} width={116} height={3} rx={1.5} fill="url(#lrail)" />
+
+        {/* garments */}
+        <Garment x={78} w={28} h={60} fill="url(#lBeige)" />
+        <Garment x={106} w={28} h={66} fill="url(#lGreen)" />
+        <Garment x={134} w={28} h={56} fill="url(#lWhite)" />
+
+        {/* hooks */}
+        <Circle cx={95} cy={84} r={4} fill="none" stroke={GOLD} strokeWidth={2} />
+        <Circle cx={123} cy={84} r={4} fill="none" stroke={GOLD} strokeWidth={2} />
+        <Circle cx={151} cy={84} r={4} fill="none" stroke={GOLD} strokeWidth={2} />
+      </G>
     </Svg>
   );
 }
