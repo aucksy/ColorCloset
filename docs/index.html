@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ColorCloset</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:radial-gradient(120% 90% at 50% 12%, #1a1510 0%, #0d0c0d 58%, #070606 100%);
+    color:#f4efe6; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex; align-items:center; justify-content:center; text-align:center; padding:32px; }
+  .badge { width:96px; height:96px; border-radius:26px; background:#14110d; border:1px solid rgba(230,192,116,0.25);
+    display:flex; align-items:center; justify-content:center; margin:0 auto 22px; }
+  h1 { font-size:38px; letter-spacing:-0.02em; margin:0 0 8px; }
+  h1 .g { color:#e6c074; }
+  p { color:#b9b1a4; font-size:16px; max-width:440px; margin:0 auto 26px; line-height:1.6; }
+  .row { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+  a.btn { text-decoration:none; font-size:14px; font-weight:600; padding:12px 20px; border-radius:12px; }
+  a.gold { background:linear-gradient(135deg,#f3dca0,#caa052); color:#2a2012; }
+  a.line { border:1px solid rgba(230,192,116,0.45); color:#e6c074; }
+</style>
+</head>
+<body>
+  <div>
+    <div class="badge">
+      <svg width="64" height="64" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+        <g transform="translate(120 120) scale(1.3) translate(-120 -118)">
+          <rect x="62" y="84" width="116" height="3" rx="1.5" fill="#e6c074"/>
+          <path d="M 78 107 Q 78 88 92 88 Q 106 88 106 107 L 106 143 Q 106 148 101 148 L 83 148 Q 78 148 78 143 Z" fill="#ecdebd"/>
+          <path d="M 106 107 Q 106 88 120 88 Q 134 88 134 107 L 134 149 Q 134 154 129 154 L 111 154 Q 106 154 106 149 Z" fill="#427a59"/>
+          <path d="M 134 107 Q 134 88 148 88 Q 162 88 162 107 L 162 139 Q 162 144 157 144 L 139 144 Q 134 144 134 139 Z" fill="#ffffff"/>
+          <circle cx="95" cy="84" r="4" fill="none" stroke="#e6c074" stroke-width="2"/>
+          <circle cx="123" cy="84" r="4" fill="none" stroke="#e6c074" stroke-width="2"/>
+          <circle cx="151" cy="84" r="4" fill="none" stroke="#e6c074" stroke-width="2"/>
+        </g>
+      </svg>
+    </div>
+    <h1>Color<span class="g">Closet</span></h1>
+    <p>Know exactly what to wear to the office — put together from the colours already hanging in your wardrobe.</p>
+    <div class="row">
+      <a class="btn gold" href="https://github.com/aucksy/ColorCloset/releases/latest">Download</a>
+      <a class="btn line" href="./privacy.html">Privacy Policy</a>
+    </div>
+  </div>
+</body>
+</html>
