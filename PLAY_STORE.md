@@ -108,7 +108,7 @@ Google Cloud Console → **APIs & Services → OAuth consent screen**:
   deck, the four-wardrobes/skin-tone screens, Colour science). PNG/JPEG, 16:9 or 9:16,
   each side 320–3840 px. *(These need the running app — grab them from your device.)*
 - **App category:** Lifestyle. **Tags:** fashion / style.
-- **Contact email:** `aakashpahuja1990@gmail.com`. **Privacy policy:** the URL from step 1.
+- **Contact email:** `simpleapps108@gmail.com`. **Privacy policy:** the URL from step 1.
 
 ## 7. App content (left nav → "App content")
 
